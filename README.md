@@ -70,11 +70,12 @@ snakemake \
 Input: Multiplexed Illumina sequencing files  
 Output: manifest.csv, total_read_counts.tsv, demultiplexed fastq files
 ### Primer trimming
-Removes ITS forward and reverse primer sequences from reads
+Removes ITS forward and reverse primer sequences from reads  
 Output: reads/reads.log 
 ### OTU clustering
-Create OTUs from amplicons using vsearch. Singletons are discarded for creating the OTUs, but used for the counts. Rules are based on this wiki: (https://github.com/torognes/vsearch/wiki/Alternative-VSEARCH-pipeline)
-Output: otu/otu_sorted.tsv 
+Create OTUs from amplicons using vsearch. Singletons are discarded for creating the OTUs, but used for the counts.  
+Rules are based on this wiki: (https://github.com/torognes/vsearch/wiki/Alternative-VSEARCH-pipeline)  
+Output: otu/otu_sorted.tsv
 ### BROCC
-Determine the taxonomic assignments of the OTUs by through a consensus based BLAST result (https://github.com/kylebittinger/brocc)
+Determine the taxonomic assignments of the OTUs by through a consensus based BLAST result (https://github.com/kylebittinger/brocc)  
 Output: BLAST_BROCC_output/out_brocc/brocc.log
