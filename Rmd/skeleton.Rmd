@@ -1,0 +1,527 @@
+---
+title: "ITS Basic Bioinformatics Overview"
+author: "PennCHOP Microbiome Program"
+date: \today
+geometry: margin=3cm
+output: 
+    pdf_document:
+        template: forKnitting/toc_after.tex
+        keep_tex: false
+        toc: true
+        toc_depth: 3
+        includes:
+            in_header: forKnitting/TeX_packages_commands.sty
+
+---
+
+\tableofcontents
+
+<!-- ================================================================================================ -->
+<!--   Beginning of Preamble : Preamble seldom requires change                                        -->
+<!-- ================================================================================================ -->
+
+
+<!-- knitr setup -->
+```{r knitr setup, echo=FALSE}
+### ================
+###   knitr setup
+### ================
+library(knitr)
+opts_chunk$set(
+  tidy=FALSE,
+  cache=TRUE,
+  echo=FALSE,
+  warning=FALSE,
+  message=FALSE,
+  dpi=100,
+  fig.width=6,
+  fig.height=5,
+  fig.align = "center"
+  )
+```
+
+<!-- R packages -->
+```{r R packages, message=FALSE}
+### ================
+###   R packages
+### ================
+##install.packages(c("dplyr", "qiimer", "pander", "ape", "vegan", "ggplot2", "gplots", "pheatmap", "tidyr", "usedist", "readr", "tibble", "lme4", "magrittr"))
+#This package will also help us more easily manipulate our data
+library(reshape)
+library(dplyr)
+library(magrittr)
+library(qiimer)
+library(pander)
+#Analyses of Phylogenetics and Evolution package. Required for tree calculations to be used with phyloseq
+library(ape)
+#The vegan package provides tools for descriptive community ecology. It has most basic functions of diversity analysis, community ordination and dissimilarity analysis. In general, this package is used for Bray-Curtis and Jaccard analyses.
+library(vegan)
+#Graphing package used in phyloseq. To edit the default setting of a plot, you need to use functions in this package.
+library(ggplot2)
+#This package is used to calculate and plot Venn diagrams as well as heatmaps
+library(gplots)
+library(pheatmap)
+#This package will help us more easily manipulate our data, which are matrices
+library(tidyr)
+library(usedist)
+library(readr)
+library(tibble)
+#Linear mixed-effects models like repeated measures analysis
+library(lme4)
+library(RColorBrewer)
+library(here)
+#used to read in mothur-formatted files
+#library(phangorn)
+#The phyloseq package seeks to address issues with multiple microbiome analysis packages by providing a set of functions that internally manage the organizing, linking, storing, and analyzing of phylogenetic sequencing data. In general, this package is used for UniFrac analyses.
+#library(phyloseq)
+#Pretty Venn disgrams
+#library(VennDiagram)
+```
+
+<!-- resources -->
+```{r functions}
+### ================
+###   R resources
+### ================
+source(here("functions", "R_all_functions_v2.R"))
+```
+
+```{r filepaths}
+### ===========================
+###   define constants
+### ===========================
+### minimum reads threshold
+min_reads <- 100
+### rarefying subsample size 
+richness_subsample_size <- 1000
+### number of samples threshold to show heatmap on the page
+sample_threshold <- 100
+
+### mapping file path
+mapping_file_fp <- list.files(here("metadata"), pattern = ".tsv|.txt|.csv", full.names = TRUE)
+
+### otu table file path
+feature_table_fp <- here("Data", "otu_sorted.tsv")
+### taxonomic assignment 
+taxo_assignment_fp <- here("Data", "brocc.log")
+### quality control
+qc_reads_fp <- here("Data", "reads.log")
+
+```
+
+```{r metadata, warning=F}
+### ===========================
+###   read in data
+### ===========================
+
+col.old <- c("subject_id", "host_species")
+col.new <- c("SubjectID", "HostSpecies")
+
+### read mapping file
+s <- read_qiime_mapping_file(mapping_file_fp) %>%
+  filter(rowSums(is.na(.)|.=="") != ncol(.)) %>%
+  rename_at(vars(col.old), ~col.new)
+
+### check for the column names to assign color_by and shape_by for pcoa plots
+### and check for number of elements in color_by to expand color palette 
+color_by <- NULL
+shape_by <- NULL
+color_number <- NULL
+color_wheel <- NULL
+potential_headers <- c("study_group", "SampleType", "study_day", "SubjectID",
+                       "current_antibiotics", "HostSpecies", "cage_number") #pick 2
+header_idx = which(is.element(potential_headers, colnames(s)))
+if(length(header_idx)>0) {
+  color_by <- potential_headers[header_idx[1]]
+  color_number <- s[color_by] %>% unique() %>% nrow()
+  color_wheel <- colorRampPalette(brewer.pal(8, "Set2"))(color_number)
+}
+
+if(length(header_idx)>1) {
+  shape_by <- potential_headers[header_idx[2]]
+}
+
+### BROCC taxonomy
+brocc <- read.delim(taxo_assignment_fp)
+
+### read otu table
+counts <- readr::read_delim(feature_table_fp, delim="\t", quote = "") %>%
+  mutate_at(vars(-c(`#OTU ID`)), as.numeric) %>%
+  column_to_rownames(var = "#OTU ID") %>%
+  as.matrix()
+
+### get read counts
+read_counts <- colSums(counts) %>% 
+  as.data.frame() %>%
+  setNames(c("Read_Counts")) %>%
+  rownames_to_column(var="SampleID")
+
+### find the samples to keep
+s <- merge(s, read_counts, by="SampleID", all.x=T) %>%
+  mutate(Keep = ifelse(!is.na(Read_Counts), Read_Counts > min_reads, FALSE)) %>%
+  mutate(isControl = grepl("EBneg.*|Extract.*|Vibriolambda.*|Blank.*|MockDNA.*|DNAfreewater.*|geneblock.*", SampleID, ignore.case = TRUE))
+
+### brocc taxonomic assignment
+ta <- read_delim(file=taxo_assignment_fp, delim="\t") %>%
+  select(Sequence, Classification) %>%
+  mutate(Sequence = gsub(";.*", "", Sequence)) %>%
+  mutate(Classification = sub("^Eukaryota;", "k__", Classification)) %>%
+  mutate(Classification = sub(';','; p__', Classification)) %>%
+  mutate(Classification = sub('(;.*?);', '\\1; c__', Classification)) %>%
+  mutate(Classification = sub('(;.*?)(;.*?);', '\\1\\2; o__', Classification)) %>%
+  mutate(Classification = sub('(;.*?)(;.*?)(;.*?);', '\\1\\2\\3; f__', Classification)) %>%
+  mutate(Classification = sub('(;.*?)(;.*?)(;.*?)(;.*?);', '\\1\\2\\3\\4; g__', Classification)) %>%
+  mutate(Classification = sub('(;.*?)(;.*?)(;.*?)(;.*?)(;.*?);', '\\1\\2\\3\\4\\5; s__', Classification)) %>%
+  arrange(order(match(rownames(counts), `Sequence`)))
+
+### check if the order of the assignments and the order of featue table is the same
+if (!all(rownames(counts) == ta$`Sequence`)) {
+  stop (simpleError("The order of the features in the table and classifications don't match"))
+}
+adf <- split_assignments(ta$Classification) 
+
+# ### pipits taxonomic assignment
+# ta <- readr::read_delim(feature_table_fp, skip=1, delim="\t", quote = "") %>%
+#   select(`#OTU ID`, taxonomy) %>%
+#   arrange(order(match(rownames(counts), `#OTU ID`)))
+# 
+# ### check if the order of the assignments and the order of featue table is the same
+# if (!all(rownames(counts) == ta$`#OTU ID`)) {
+#   stop (simpleError("The order of the features in the table and classifications don't match"))
+# }
+# adf <- split_assignments(ta$taxonomy) 
+
+### remove contamination
+is_mitochondrial <- grepl("mitochondria", adf$Family)
+is_chloroplast <- grepl("Chloroplast", adf$Class)
+is_unassigned <- is.na(adf$Phylum)
+is_archaea <- grepl("Archaea", adf$Kingdom)
+is_contam <- is_mitochondrial | is_chloroplast | is_unassigned ### Archaea kept to check positive control samples
+counts <- counts[!is_contam,]
+counts <- counts[, colSums(counts) > 0]
+adf <- adf[!is_contam,]
+ta <- ta[!is_contam,]
+rm(is_contam, is_mitochondrial, is_chloroplast, is_unassigned, is_archaea)
+a <- simplify_assignments(adf, rank1="Phylum", rank2="Species")
+names(a) <- ta$`Sequence`
+
+### conventional relative abundance
+summed_cts <- rowsum(counts, a) 
+summed_props <- sweep(summed_cts, 2, colSums(summed_cts), "/")
+#if we want all the otus
+# all_otus <- counts %>%
+#   merge(ta[,c("Sequence","Confidence","trunc_taxon")], by.x="row.names", by.y="Sequence", all.x=T) %>%
+#   dplyr::rename(Taxon = trunc_taxon) %>%
+#   dplyr::rename(`Sequence` = Row.names)
+# 
+# write.table(x = all_otus, file = here("output", "OTUs", "all_otus.tsv"), sep = "\t", row.names = F, quote = FALSE)
+
+# ###picogreen corrected abundance
+# #get picogreen conc
+# picoGreen <- s$final_library_conc_ng_ul
+# names(picoGreen) <- s$SampleID
+# picoGreen <- picoGreen[colnames(counts)]
+# 
+# #get picogreen otu table
+# otu_props <- sweep(counts, 2, colSums(counts), "/")
+# otu_props <- sweep(otu_props, 2, picoGreen, "*")
+# 
+# neg_otu_props <- otu_props[,grepl("EBneg.*|Extract.*|Blank.*|DNAfreewater.*", colnames(otu_props), ignore.case = TRUE)]
+# neg_otu_props <- neg_otu_props[rowSums(neg_otu_props) != 0, colSums(neg_otu_props) > 0]
+# 
+# #get cumulative area under curve neg ctrl otu props
+# otu_ecdf <- neg_otu_props %>%
+#   melt() %>%
+#   filter(value!=0) %>%
+#   select(value) %>%
+#   as.matrix() %>%
+#   ecdf()
+# 
+# #threshold for filtering out picogreen otu
+# ctrl_thresh <- quantile(otu_ecdf, 0.95)
+# 
+# otu_props[otu_props < ctrl_thresh] = 0
+# otu_props <- otu_props[rowSums(otu_props) != 0, colSums(otu_props) > 0]
+# otu_a <- a[match(rownames(otu_props), names(a))]
+# summed_otu_props <- rowsum(otu_props, otu_a)
+
+```
+
+\newpage
+```{r, Samples error check 1}
+### ===========================
+###   check for missing samples
+### ===========================
+
+### possible issue 1: Samples found in the sample sheet but not in the feature table (0 reads)
+s_missing <- s %>%
+  filter(!SampleID %in% colnames(counts)) %>%
+  select(SampleID, SampleType, isControl)
+
+if (any(!s_missing$isControl)) {
+  pander(filter(s_missing, !isControl), caption="These samples were in the sample sheet but not in the feature table.")
+  #stop (simpleError("Please fix"))
+}
+
+s[s$SampleID %in% s_missing$SampleID, "Keep"] <- FALSE
+```
+
+
+```{r, Samples error check 2}
+### possible issue 2: Samples found in the feature table but not in the sample sheet. There must be an error!
+in_counts_not_in_s <- setdiff(colnames(counts), s$SampleID)
+if (length(in_counts_not_in_s) > 0) {
+  stop (simpleError("These SampleID(s) are in the feature table, but not found in the sample sheet.", paste(in_counts_not_in_s, collapse=" ")))
+}
+```
+
+```{r alpha diversity, warning=F}
+### ===========================
+###   calculate / read in alpha diversity
+### ===========================
+
+# dplyr::filter(!isControl) %>%
+s <- s %>%
+  merge(vegan::diversity(t(counts)), by.x="SampleID", by.y="row.names", all.x=T) %>%
+  dplyr::rename(shannon = y) %>%
+  merge(rarefy(t(counts), richness_subsample_size), by.x="SampleID", by.y="row.names", all.x=T) %>%
+  dplyr::rename(richness = y)
+```
+
+```{r investigator}
+### ===========================
+###   extract investigator and run date from the sample sheet
+### ===========================
+
+all_dates <- as.character(unique(s$run_start_date))
+run_date <- paste(lapply(all_dates, change_date_format), collapse=', ')
+investigator <- paste(unique(s$investigator)[1], collapse = ", ")
+```
+\newpage
+# Introduction
+This report is based on the results of sequencing performed on `r run_date` for `r investigator`. 
+
+## Quality control trimming
+
+```{r reads trim}
+qc <- read_delim(qc_reads_fp, delim = "\t", col_names = FALSE) %>%
+  dplyr::rename(counts = "X1") %>%
+  mutate(filename = gsub(".*/", "", X2)) %>%
+  mutate(direction = ifelse(grepl("_R1", filename), "Forward",
+                     ifelse(grepl("_R2", filename), "Reverse", NA))) %>%
+  fill(direction, .direction = "downup") %>%
+  mutate(SampleID = gsub("_.*", "", filename)) %>%
+  mutate(trim_stage = ifelse(grepl("_R[12].fastq", filename), "Initial demultiplex",
+                      ifelse(grepl("_r_trimmed.fastq", filename), "Reverse primer trim",
+                      ifelse(grepl("_rf_trimmed.fastq", filename), "Forward primer trim", NA)))) %>%
+  mutate(trim_stage = factor(trim_stage, levels = c("Initial demultiplex", "Reverse primer trim", "Forward primer trim"))) %>%
+  group_by(SampleID, direction) %>%
+  mutate(initial_reads = ifelse(trim_stage == "Initial demultiplex", counts, NA)) %>%
+  fill(initial_reads, .direction = "downup") %>%
+  ungroup() %>%
+  mutate(perc_reads = ifelse(initial_reads != 0, counts/initial_reads, 0)) %>%
+  merge(select(s, SampleID, SampleType), by = "SampleID", all.x = TRUE)
+
+qc %>%
+  ggplot(aes(y = perc_reads, x = trim_stage, group = SampleID)) +
+    geom_line(aes(color = SampleType)) +
+    geom_point(aes(fill = SampleType), shape = 21) +
+    facet_wrap(~direction, ncol = 1) +
+    scale_y_continuous(labels = scales::percent) +
+    labs(y = "Percent of reads kept", x = "Trimming stage") +
+    theme(axis.text.x=element_text(angle=-25, hjust= .1))
+
+```
+\newpage
+## Histogram of high quality paired reads per sample
+The black dashed vertical line shows the minimum number of reads (`r min_reads`) for analysis. Control samples, if any, were included in the histogram.
+
+```{r reads histogram, fig.width=6, fig.height=4, warning=F}
+s %>%
+  ggplot(aes(x=Read_Counts)) +
+    geom_histogram(aes(fill=SampleType), boundary = TRUE) +
+    geom_vline(xintercept = min_reads, color="black", linetype="dashed") +
+    theme_classic() +
+    theme_bw() + 
+    xlab("Number of reads in sample") +
+    ylab("Number of samples")
+```
+
+\newpage
+## Read counts and final library concentration of each sample
+
+```{r}
+
+s %>%
+  mutate(Read_Counts = ifelse(is.na(Read_Counts), 0, Read_Counts)) %>%
+  droplevels() %>%
+  ggplot(aes(x = final_library_conc_ng_ul, y = Read_Counts, fill = SampleType)) +
+    geom_point(shape = 21) +
+    geom_hline(yintercept = min_reads, color="black", linetype="dashed") +
+    theme_bw() + 
+    scale_y_continuous(trans = "log10") +
+    guides(fill = guide_legend(override.aes = list(shape = 21))) +
+    labs(y = "Read Counts", x = "Final library DNA conc (ng/uL)")
+
+```
+
+\newpage
+
+## Whole samples that are above the `r min_reads` read count threshold
+
+```{r table}
+pander(table(s[, color_by], factor(ifelse(s$Keep, "Keep", "Discard"))))
+```
+
+<!-- ## PicoGreen-corrected OTU abundances -->
+
+<!-- Histogram of PicoGreen-corrected OTU abundances in control samples. OTUs in all samples are considered contaminants if they fall below the 95% limit of the abundance distribution (left of the red line) and will be ignored -->
+
+<!-- ```{r} -->
+
+<!-- neg_otu_props %>% -->
+<!--   melt() %>% -->
+<!--   filter(value!=0) %>% -->
+<!--   ggplot(aes(x=value)) + -->
+<!--     geom_histogram(binwidth = 0.1) + -->
+<!--     theme_bw() + -->
+<!--     geom_vline(xintercept = ctrl_thresh, color="red", linetype="dashed") + -->
+<!--     labs( -->
+<!--       x="PicoGreen corrected OTU abundances in negative control samples (ng/uL)", -->
+<!--       y="Number of taxa", -->
+<!--       title=paste("All OTUs below the PicoGreen corrected OTU abundance threshold of ", round(ctrl_thresh, 2), "ng/uL will be ignored") -->
+<!--     ) -->
+
+<!-- ``` -->
+
+\blandscape
+
+# Taxonomic heatmap
+
+```{r heatmap constants}
+prop_cut <- 0.01
+thre <- 0.2
+satu_limit <- 0.4
+heatmap_fp <- here("otu_heatmap.pdf")
+show.text <- sum(s$Keep) > sample_threshold
+```
+
+Each column of the heatmap represents one sample and each row represents one taxon, typically a genus. Taxa were included in the chart if they are present in at least `r 100*thre`% of samples
+
+The chart is colored white if taxa were not observed in the sample, dark blue if taxa were observed at very low abundance. This allows the reader to quickly survey presence/absence. Abundance values exceeding `r 100*satu_limit`% are colored red, indicating an extremely dominant species.
+
+`r if(show.text){paste0("Please see attached plot otu_heatmap.pdf")}`
+
+```{r heatmap, fig.height=12, fig.width=16}
+s_toPlot <- s %>%
+  filter(Keep)
+  
+props_toPlot <- summed_props[, s_toPlot$SampleID]
+#if groups contain NA, such as for controls, include NA as a factor level
+grps <- c(color_by, shape_by)
+### grouped heatmap
+if (dim(s_toPlot)[1] > sample_threshold) {
+  heatmap_grouped(props_toPlot, s_toPlot, grps=grps, option=1, thre = thre, prop_cut = prop_cut, satu_limit=satu_limit, fname = heatmap_fp)
+} else {
+  heatmap_grouped(props_toPlot, s_toPlot, grps=grps, option=1, thre = thre, prop_cut = prop_cut, satu_limit=satu_limit)
+}
+```
+
+\elandscape
+
+# Alpha Diversity
+
+Alpha diversity was assessd by the expected number of observed OTUs (out of rarefying sample size of `r richness_subsample_size`) and Shannon index.
+
+## Number of observed OTUs
+
+```{r richness}
+alpha_measure <- "richness"
+s %>% filter(Keep) %>%
+  filter(!isControl) %>%
+  ggplot(aes(x=eval(parse(text=color_by)), y=eval(parse(text=alpha_measure)), color=eval(parse(text=color_by)))) +
+  geom_boxplot(outlier.alpha = 0) +
+  geom_point(size = 2, position = position_jitterdodge()) +
+  labs(y=alpha_measure, x=color_by, color=color_by) +
+  theme_bw() +
+  theme(axis.text.x=element_text(angle=-25, hjust= .1),
+        panel.grid = element_blank(),
+        strip.background = element_blank()) +
+  #guides(color=F) +
+  scale_fill_manual(values = color_wheel) +
+  labs(x="study group", color="study group")
+  #scale_color_brewer(palette = "Set2")
+```
+
+## Shannon Index
+
+```{r shannon}
+alpha_measure <- "shannon"
+s %>% filter(Keep) %>%
+  filter(!isControl) %>%
+  ggplot(aes(x=eval(parse(text=color_by)), y=eval(parse(text=alpha_measure)), color=eval(parse(text=color_by)))) +
+  geom_boxplot(outlier.alpha = 0) +
+  geom_point(size = 2, position = position_jitterdodge()) +
+  labs(y=alpha_measure, x=color_by, color=color_by) +
+  theme_bw() +
+  theme(axis.text.x=element_text(angle=-25, hjust= .1),
+        panel.grid = element_blank(),
+        strip.background = element_blank()) +
+  #guides(color=F) +
+  scale_fill_manual(values = color_wheel) +
+  labs(x="study group", color="study group")
+  #scale_color_brewer(palette = "Set2")
+```
+
+
+\newpage 
+
+# Beta diversity
+
+Similarity between samples was assessed by Bray Curtis and Jaccard distances. 
+
+## Bray-Curtis distance
+
+### PCoA plot based on Bray-Curtis distance
+
+Here, we use Bray-Curtis distance to compare the species composition of the samples to each other.
+
+The first plot shows the distance between each pair of samples in a single 2D plot.  It is not possible to plot the distances exactly on paper, so we have used a method of ordination called Principal Coordinates Analysis to select the best coordinate system for display.  The percentage of total variance captured along each axis is displayed on the chart.
+
+```{r bray-curtis, fig.height=5, fig.width=7}
+bc <- vegdist(t(summed_props))
+dist_in <- usedist::dist_subset(bc, s_toPlot$SampleID)
+plot(make_pcoa_plot(dm = dist_in, s = s_toPlot, color_by=color_by, shape_by=shape_by))
+
+#manual
+#plot(make_pcoa_plot(dist_in, s_toPlot, color_by="SampleType", shape_by="expected_genus"))
+```
+\newpage
+
+\newpage
+
+## Jaccard distance
+
+Here, we use Jaccard distance to compare samples based on shared species membership.  Plots are described above.
+
+### PCoA plot based on Jaccard distance
+
+```{r jaccard, fig.height=5, fig.width=7}
+jd <- vegdist(t(summed_props), binary=TRUE)
+
+dist_in <- usedist::dist_subset(jd, s_toPlot$SampleID)
+plot(make_pcoa_plot(dist_in, s_toPlot,  color_by=color_by, shape_by=shape_by))
+```
+
+\newpage
+
+# APPENDIX: Counts of high quality paired reads for each sample
+```{r appendix}
+s %>% 
+  select(SampleID, Read_Counts, final_library_conc_ng_ul, Keep) %>%
+  dplyr::rename(library_ng_ul = "final_library_conc_ng_ul") %>%
+  arrange(-Read_Counts) %>% 
+  pander()
+```
+
+

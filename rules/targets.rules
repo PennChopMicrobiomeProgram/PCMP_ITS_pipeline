@@ -1,0 +1,17 @@
+TARGET_DEMUX = expand(DEMUX_DIR + "/{sample}_{direction}.fastq", sample = SAMPLE_IDS, direction = ["R1", "R2"])
+
+TARGET_TRIM = expand(PRIMER_TRIM_FP + "/{sample}_rf_trimmed.fastq", sample = SAMPLE_IDS)
+
+TARGET_OTU = [str(OTU_DIR) + "/otu_sorted.tsv"]
+
+TARGET_BL_BR = [str(BL_BR_DIR + "/out_brocc/brocc.log")]
+
+TARGET_REPORT = [str(READ_DIR) + "/reads.log"]
+
+TARGET_ALL = (
+  TARGET_DEMUX +
+  TARGET_TRIM +
+  TARGET_OTU +
+  TARGET_BL_BR +
+  TARGET_REPORT
+)

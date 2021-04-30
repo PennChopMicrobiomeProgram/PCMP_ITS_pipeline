@@ -1,0 +1,77 @@
+rule all_trim:
+    input:
+        TARGET_TRIM + TARGET_REPORT
+
+dir = "2"
+if config["all"]["forward_direction"]:
+  dir = "1"
+
+rule trim_r:
+    input:
+        DEMUX_DIR + "/{sample}_R" + dir + ".fastq"
+    params:
+        mismatch = config["trim"]["mismatch"],
+        rev = config["trim"]["r_primer"],
+        min_length = config["trim"]["min_length"],
+        align_fp = PRIMER_TRIM_FP + "/alignment_r/{sample}",
+        threads = config["all"]["threads"]
+    output:
+        trim_fp = PRIMER_TRIM_FP + "/{sample}_r_trimmed.fastq",
+        log_fp = PRIMER_TRIM_FP + "/{sample}_r_trimmed.log",
+        read_fp = READ_DIR + "/{sample}.fastq",
+        trim_read_fp = READ_DIR + "/{sample}_trim_r.fastq"
+    shell:
+        """
+        mkdir -p {params.align_fp}
+        wc -l {input} | awk '{{x=$1/4; print x"\t"$2}}' > {output.read_fp}
+        ptrim {params.rev} \
+          -i {input} \
+          -o {output.trim_fp} \
+          --log {output.log_fp} \
+          --mismatches {params.mismatch} \
+          --min-partial {params.min_length} \
+          --alignment \
+          --alignment-dir {params.align_fp} \
+          --threads {params.threads} && \
+        wc -l {output.trim_fp} | awk '{{x=$1/4; print x"\t"$2}}' > {output.trim_read_fp}
+        """
+
+rule trim_f:
+    input:
+        PRIMER_TRIM_FP + "/{sample}_r_trimmed.fastq"
+    params:
+        mismatch = config["trim"]["mismatch"],
+        fwd = config["trim"]["f_primer"],
+        min_length = config["trim"]["min_length"],
+        align_fp = PRIMER_TRIM_FP + "/alignment_rf/{sample}",
+        threads = config["all"]["threads"]
+    output:
+        trim_fp = PRIMER_TRIM_FP + "/{sample}_rf_trimmed.fastq",
+        log_fp = PRIMER_TRIM_FP + "/{sample}_rf_trimmed.log",
+        trim_read_fp = READ_DIR + "/{sample}_trim_rf.fastq"
+    shell:
+        """
+        mkdir -p {params.align_fp}
+        ptrim {params.fwd} \
+          -i {input} \
+          -o {output.trim_fp} \
+          --log {output.log_fp} \
+          --mismatches {params.mismatch} \
+          --min-partial {params.min_length} \
+          --alignment \
+          --alignment-dir {params.align_fp} \
+          --threads {params.threads} && \
+        wc -l {output.trim_fp} | awk '{{x=$1/4; print x"\t"$2}}' > {output.trim_read_fp}
+        """
+
+rule read_report:
+    input:
+        expand(PRIMER_TRIM_FP + "/{sample}_rf_trimmed.fastq", sample = SAMPLE_IDS)
+    output:
+        READ_DIR + "/reads.log"
+    params:
+        READ_DIR + "/*"
+    shell:
+        """
+        cat {params} > {output}
+        """

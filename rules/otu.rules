@@ -1,0 +1,186 @@
+rule fq_2_fa:
+    input:
+        PRIMER_TRIM_FP + "/{sample}_rf_trimmed.fastq"
+    params:
+        config["otu"]["expected_error"]
+    output:
+        FASTA_DIR + "/{sample}.fasta"
+    shell:
+        """
+        vsearch \
+            --fastq_filter {input} \
+            --fastq_truncee {params} \
+            --fastaout {output}
+        """
+
+rule sample_derep:
+    input:
+        FASTA_DIR + "/{sample}.fasta"
+    output:
+        FASTA_DIR + "/{sample}_derep.fasta"
+    params:
+        "sample={sample}\;"
+    shell:
+        """
+        vsearch --derep_fulllength {input} \
+            --strand plus \
+            --fasta_width 0 \
+            --output {output} \
+            --sizeout \
+            --relabel {params}
+        """
+
+rule concat_fa:
+    input:
+        expand(FASTA_DIR + "/{sample}_derep.fasta", sample = SAMPLE_IDS)
+    output:
+        OTU_DIR + "/all_samples.fasta"
+    shell:
+        """
+        cat {input} > {output}
+        """
+
+rule all_derep:
+    input:
+        OTU_DIR + "/all_samples.fasta"
+    output:
+        uc = OTU_DIR + "/all_derep.uc",
+        out = OTU_DIR + "/all_derep.fasta"
+    params:
+        config["otu"]["threads"]
+    shell:
+        """
+        vsearch --derep_fulllength {input} \
+            --threads {params} \
+            --sizein \
+            --sizeout \
+            --fasta_width 0 \
+            --uc {output.uc} \
+            --output {output.out}
+        """
+
+rule cluster:
+    input:
+        OTU_DIR + "/all_derep.fasta"
+    output:
+        OTU_DIR + "/centroids.fasta"
+    params:
+        threads = config["otu"]["threads"],
+        id = config["otu"]["otu_id"]
+    shell:
+        """
+        vsearch --cluster_unoise {input} \
+            --threads {params.threads} \
+            --id {params.id} \
+            --strand plus \
+            --sizein \
+            --sizeout \
+            --fasta_width 0 \
+            --centroids {output}
+        """
+
+rule sort_centroids:
+    input:
+        OTU_DIR + "/centroids.fasta"
+    output:
+        OTU_DIR + "/centroids_sorted.fasta"
+    params:
+        config["otu"]["threads"]
+    shell:
+        """
+        vsearch --sortbysize {input} \
+            --threads {params} \
+            --sizein \
+            --sizeout \
+            --fasta_width 0 \
+            --minsize 2 \
+            --output {output}
+        """
+
+rule denovo_chimera:
+    input:
+        OTU_DIR + "/centroids_sorted.fasta"
+    output:
+        OTU_DIR + "/denovo.nonchimeras.fasta"
+    shell:
+        """
+        vsearch --uchime3_denovo {input} \
+            --sizein \
+            --sizeout \
+            --fasta_width 0 \
+            --qmask none \
+            --nonchimeras {output}
+        """
+
+rule ref_chimera:
+    input:
+        OTU_DIR + "/denovo.nonchimeras.fasta"
+    output:
+        OTU_DIR + "/nonchimeras.fasta"
+    params:
+        threads = config["otu"]["threads"],
+        db = config["otu"]["chimera_db"]
+    shell:
+        """
+        vsearch --uchime_ref {input} \
+            --threads {params.threads} \
+            --db {params.db} \
+            --sizein \
+            --sizeout \
+            --fasta_width 0 \
+            --qmask none \
+            --dbmask none \
+            --nonchimeras {output}
+        """
+
+rule cat_OTU:
+    input:
+        OTU_DIR + "/nonchimeras.fasta" if config["otu"]["chimera_db"] else OTU_DIR + "/denovo.nonchimeras.fasta"
+    output:
+        OTU_DIR + "/otu.fasta"
+    params:
+        config["otu"]["threads"]
+    shell:
+        """
+        vsearch --fastx_filter {input} \
+            --threads {params} \
+            --sizein \
+            --sizeout \
+            --fasta_width 0 \
+            --relabel OTU_ \
+            --fastaout {output}
+        """
+
+rule map_back:
+    input:
+        otus = OTU_DIR + "/otu.fasta",
+        samples = OTU_DIR + "/all_samples.fasta"
+    output:
+        OTU_DIR + "/otu.tsv"
+    params:
+        threads = config["otu"]["threads"],
+        id = config["otu"]["otu_id"]
+    shell:
+        """
+        vsearch --usearch_global {input.samples} \
+            --threads {params.threads} \
+            --db {input.otus} \
+            --id {params.id} \
+            --strand plus \
+            --sizein \
+            --sizeout \
+            --fasta_width 0 \
+            --qmask none \
+            --dbmask none \
+            --otutabout {output}
+	"""
+        
+rule sort_otu:
+    input:
+        OTU_DIR + "/otu.tsv"
+    output:
+        OTU_DIR + "/otu_sorted.tsv"
+    shell:
+        """
+            sort -k1.5n {input} > {output}
+        """

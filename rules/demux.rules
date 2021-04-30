@@ -1,0 +1,41 @@
+rule all_demux:
+    input:
+        TARGET_DEMUX
+
+rule run_dnabc:
+    input:
+        R1 = MUX_DIR + "/Undetermined_S0_L001_R1_001.fastq.gz",
+        R2 = MUX_DIR + "/Undetermined_S0_L001_R2_001.fastq.gz"
+    params:
+        demux_dir = DEMUX_DIR,
+        mismatch = config["demux"]["mismatch"],
+        revcomp = config["demux"]["revcomp"],
+        reads_dir = READ_DIR,
+        manifest_fp = PROJECT_DIR + "/manifest.csv",
+        total_reads_fp = PROJECT_DIR + "/total_read_counts.tsv"
+    output:
+        expand(DEMUX_DIR + "/{sample}_{direction}.fastq", sample = SAMPLE_IDS, direction = ["R1", "R2"])
+    run:
+        if params.revcomp:
+            shell("""
+            mkdir -p {params.reads_dir}
+            touch {output}
+            dnabc.py \
+            --revcomp \
+            --output-dir {params.demux_dir} \
+            --mismatches {params.mismatch} \
+            --manifest-file {params.manifest_fp} \
+            --total-reads-file {params.total_reads_fp} \
+            {MAPPING_FP} {input.R1} {input.R2}
+            """)
+        else:
+            shell("""
+            mkdir -p {params.reads_dir}
+            touch {output}
+            dnabc.py \
+            --output-dir {params.demux_dir} \
+            --mismatches {params.mismatch} \
+            --manifest-file {params.manifest_fp} \
+            --total-reads-file {params.total_reads_fp} \
+            {MAPPING_FP} {input.R1} {input.R2}
+            """)

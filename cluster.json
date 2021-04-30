@@ -1,0 +1,92 @@
+{
+    "__default__" :
+    {
+        "memcpu" : "4G",
+        "name" : "ITS_default"
+    },
+    "run_dnabc" :
+    {
+        "memcpu" : "8G",
+        "name" : "run_dnabc"
+    },
+    "trim_r" :
+    {
+        "memcpu" : "8G",
+        "name" : "trim_r"
+    },
+    "trim_f" :
+    {
+        "memcpu" : "8G",
+        "name" : "trim_f"
+    },
+    "read_report" :
+    {
+        "memcpu" : "4G",
+        "name" : "read_report"
+    },
+    "fq_2_fa" :
+    {
+        "memcpu" : "2G",
+        "name" : "fq_2_fa"
+    },
+    "sample_derep" :
+    {
+        "memcpu" : "2G",
+        "name" : "sample_derep"
+    },
+    "concat_fa" :
+    {
+        "memcpu" : "4G",
+        "name" : "concat_fa"
+    },
+    "all_derep" :
+    {
+        "memcpu" : "4G",
+        "name" : "all_derep"
+    },
+    "cluster" :
+    {
+        "memcpu" : "16G",
+        "name" : "cluster"
+    },
+    "sort_centroids" :
+    {
+        "memcpu" : "4G",
+        "name" : "sort_centroids"
+    },
+    "denovo_chimera" :
+    {
+        "memcpu" : "4G",
+        "name" : "denovo_chimera"
+    },
+    "ref_chimera" :
+    {
+        "memcpu" : "8G",
+        "name" : "ref_chimera"
+    },
+    "cat_OTU" :
+    {
+        "memcpu" : "4G",
+        "name" : "cat_OTU"
+    },
+    "map_back" :
+    {
+        "memcpu" : "8G",
+        "name" : "map_back"
+    },
+    "sort_otu" :
+    {
+        "memcpu" : "4G",
+        "name" : "sort_otu"
+    },
+    "blastn" :
+    {
+        "memcpu" : "24G",
+        "name" : "blastn"
+    },
+    "brocc" :
+    {
+        "memcpu" : "24G",
+        "name" : "brocc"
+    }
+}
