@@ -10,8 +10,8 @@ git clone https://github.com/PennChopMicrobiomeProgram/PCMP_ITS_pipeline.git
 - Create a conda environment and install the required packages:
 ```bash
 cd PCMP_ITS_pipeline
-conda create -n PCMP_ITS_pipeline --channel bioconda --channel conda-forge --channel defaults python=3.6
-conda install --name PCMP_ITS_pipeline --file requirements.txt
+conda create -y -n PCMP_ITS_pipeline --channel bioconda --channel conda-forge --channel defaults python=3.6
+conda install -y --name PCMP_ITS_pipeline --file requirements.txt
 conda activate PCMP_ITS_pipeline
 pip install brocc #brocc needs to be installed with pip in the environment
 ```
