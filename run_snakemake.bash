@@ -7,7 +7,7 @@
 #SBATCH --output=slurm_%x_%j.out
 #SBATCH -t 5-0
 
-#Uncomment the next two lines if you want to 'qsub' this script
+#Uncomment the next two lines if you want to 'sbatch' this script
 source ~/.bashrc.conda #needed to make "conda" command to work
 conda activate PCMP_ITS_pipeline
 
@@ -22,6 +22,7 @@ CONFIG_FP=$1
 
 snakemake \
     --jobs 100 \
+    --nolock \
     --configfile ${CONFIG_FP} \
     --cluster-config cluster.json \
     --keep-going \
