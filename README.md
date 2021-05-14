@@ -72,7 +72,7 @@ Input: Multiplexed Illumina sequencing files
 Output: manifest.csv, total_read_counts.tsv, demultiplexed fastq files
 ### Primer trimming
 Removes ITS forward and reverse primer sequences from reads  
-Output: reads/reads.log 
+Output: reads/(reads.log, top_{rf}_seqs_trimmed.txt, {rf}_trimmed_removed_counts.txt)
 ### OTU clustering
 Create OTUs from amplicons using vsearch. Singletons are discarded for creating the OTUs, but used for the counts.  
 Rules are based on this wiki: (https://github.com/torognes/vsearch/wiki/Alternative-VSEARCH-pipeline)  
