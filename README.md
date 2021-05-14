@@ -18,6 +18,7 @@ conda install --name PCMP_ITS_pipeline --file requirements.txt
 - The following software also need to be installed:
   - `dnabc` (https://github.com/PennChopMicrobiomeProgram/dnabc)
   - `primertrim` (https://github.com/PennChopMicrobiomeProgram/primertrim)
+  - `okfasta` (https://github.com/kylebittinger/okfasta)
   - To install (dnabc as example):
   ```bash
   git clone https://github.com/PennChopMicrobiomeProgram/dnabc
@@ -49,7 +50,7 @@ To run the pipeline, we need
   - **otu: expected_error**: Threshold for truncating reads 
   - **otu: otu_id**: Percent sequence identity for clustering reads into OTUs
   - **otu: threads**: Number of threads to use
-  - **otu: chimera_db**: Path to UCHIME reference dataset for chimera detection (see https://unite.ut.ee/repository.php)
+  - **otu: chimera_db**: Path to UCHIME reference dataset for chimera detection (see https://unite.ut.ee/repository.php); leave blank if using mock DNA amplified with chimera primers
   - **blastn: ncbi_db**: Path to a local ncbi nt database
 - To run the pipeline, activate the environment by entering `conda activate PCMP_ITS_pipeline`, `cd` into the project directory and execute:
 ```bash

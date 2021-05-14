@@ -29,4 +29,4 @@ snakemake \
     --notemp \
     --printshellcmds \
     --cluster \
-    "sbatch --no-requeue --export=ALL --mem={cluster.memcpu} -n {threads} -t 1-0 -J {cluster.name} --output=slurm_%x_%j.out"
+    "sbatch --no-requeue --export=ALL --mem={cluster.memcpu} -n {threads} -t 2-0 -J {cluster.name} --output=slurm_%x_%j.out"

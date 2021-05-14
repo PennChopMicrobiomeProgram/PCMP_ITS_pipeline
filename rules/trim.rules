@@ -1,7 +1,3 @@
-rule all_trim:
-    input:
-        TARGET_TRIM + TARGET_REPORT
-
 dir = "2"
 if config["all"]["forward_direction"]:
   dir = "1"
@@ -18,8 +14,9 @@ rule trim_r:
     output:
         trim_fp = PRIMER_TRIM_FP + "/{sample}_r_trimmed.fastq",
         log_fp = PRIMER_TRIM_FP + "/{sample}_r_trimmed.log",
-        read_fp = READ_DIR + "/{sample}.fastq",
-        trim_read_fp = READ_DIR + "/{sample}_trim_r.fastq"
+        read_fp = READ_INTER_DIR + "/{sample}.fastq",
+        trim_read_fp = READ_INTER_DIR + "/{sample}_trim_r.fastq",
+        trimmed_fasta = PRIMER_TRIM_FP + "/alignment_r/{sample}/query.fa"
     shell:
         """
         mkdir -p {params.align_fp}
@@ -48,7 +45,8 @@ rule trim_f:
     output:
         trim_fp = PRIMER_TRIM_FP + "/{sample}_rf_trimmed.fastq",
         log_fp = PRIMER_TRIM_FP + "/{sample}_rf_trimmed.log",
-        trim_read_fp = READ_DIR + "/{sample}_trim_rf.fastq"
+        trim_read_fp = READ_INTER_DIR + "/{sample}_trim_rf.fastq",
+        trimmed_fasta = PRIMER_TRIM_FP + "/alignment_rf/{sample}/query.fa"
     shell:
         """
         mkdir -p {params.align_fp}
@@ -70,7 +68,7 @@ rule read_report:
     output:
         READ_DIR + "/reads.log"
     params:
-        READ_DIR + "/*"
+        READ_INTER_DIR + "/*.fastq"
     shell:
         """
         cat {params} > {output}

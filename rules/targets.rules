@@ -8,10 +8,19 @@ TARGET_BL_BR = [str(BL_BR_DIR + "/out_brocc/brocc.log")]
 
 TARGET_REPORT = [str(READ_DIR) + "/reads.log"]
 
+TARGET_TRIM_LEN = [str(READ_DIR) + "/trim_len.tsv"]
+
+TARGET_COMMON_TRIMMED_SEQS = [READ_DIR + "/top_r_seqs_trimmed.txt",
+                              READ_DIR + "/top_f_seqs_trimmed.txt",
+                              READ_DIR + "/r_trimmed_removed_counts.txt",
+                              READ_DIR + "/f_trimmed_removed_counts.txt"]
+
 TARGET_ALL = (
   TARGET_DEMUX +
   TARGET_TRIM +
   TARGET_OTU +
   TARGET_BL_BR +
-  TARGET_REPORT
+  TARGET_REPORT +
+  TARGET_TRIM_LEN +
+  TARGET_COMMON_TRIMMED_SEQS
 )

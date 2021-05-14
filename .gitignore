@@ -5,11 +5,12 @@ reads/
 otu/
 dnabc/
 primertrim/
+okfasta/
 scripts/__pycache__/
 .snakemake/
 snakejob*
 transfer*
-*.tsv
+Igoucheva*
 *.swp
 manifest.csv
 .DS_Store
@@ -17,3 +18,4 @@ manifest.csv
 .Rproj
 .Rhistory
 test_config.yml
+total_read_counts.tsv

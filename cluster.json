@@ -88,5 +88,75 @@
     {
         "memcpu" : "24G",
         "name" : "brocc"
+    },
+    "fq2fa_r" :
+    {
+        "memcpu" : "24G",
+        "name" : "fq2fa_r"
+    },
+    "get_trim_r_len" :
+    {
+        "memcpu" : "4G",
+        "name" : "get_trim_r_len"
+    },
+    "get_trim_r_len_zeros" :
+    {
+        "memcpu" : "4G",
+        "name" : "get_trim_r_len_zeros"
+    },
+    "get_trim_f_len" :
+    {
+        "memcpu" : "4G",
+        "name" : "get_trim_f_len"
+    },
+    "get_trim_f_len_zeros" :
+    {
+        "memcpu" : "4G",
+        "name" : "get_trim_f_len_zeros"
+    },
+    "get_trimmings" :
+    {
+        "memcpu" : "24G",
+        "name" : "get_trimmings"
+    },
+    "most_common_r_trimmed" :
+    {
+        "memcpu" : "4G",
+        "name" : "most_common_r_trimmed"
+    },
+    "most_common_f_trimmed" :
+    {
+        "memcpu" : "4G",
+        "name" : "most_common_f_trimmed"
+    },
+    "top_ten_r_trimmed" :
+    {
+        "memcpu" : "24G",
+        "name" : "top_ten_r_trimmed"
+    },
+    "top_ten_f_trimmed" :
+    {
+        "memcpu" : "24G",
+        "name" : "top_ten_f_trimmed"
+    },
+    "find_first_index_r" :
+    {
+        "memcpu" : "4G",
+        "name" : "find_first_index_r"
+    },
+    "r_reads_removed_count" :
+    {
+        "memcpu" : "4G",
+        "name" : "r_reads_removed_count"
+    },
+    "find_first_index_f" :
+    {
+        "memcpu" : "4G",
+        "name" : "find_first_index_f"
+    },
+    "f_reads_removed_count" :
+    {
+        "memcpu" : "4G",
+        "name" : "f_reads_removed_count"
     }
 }

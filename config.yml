@@ -20,7 +20,7 @@ otu:
   expected_error: 1
   otu_id: 0.99
   threads: 8
-  chimera_db: "/mnt/isilon/microbiome/analysis/biodata/UNITE_uchime_chimera/uchime_reference_dataset_28.06.2017.fasta"
+  chimera_db: #leave blank if using mockdna positive controls
 
 blastn:
   ncbi_db: "/mnt/isilon/microbiome/analysis/biodata/blast/nt_20180816/nt"
