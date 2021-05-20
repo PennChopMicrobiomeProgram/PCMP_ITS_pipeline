@@ -263,7 +263,8 @@ heatmap_grouped <- function(summed_props, heatmap_s, group_colors = NULL, grps =
   heatmap_props <- heatmap_props[rows_to_keep,]
   
   ## group the SampleIDs
-  #heatmap_s %<>% arrange_(.dots=grps)
+  grps_symbol <- syms(grps)
+  heatmap_s %<>% arrange(!!!grps_symbol)
   heatmap_props <- heatmap_props[, heatmap_s$SampleID]
   
   ## update the annotation
