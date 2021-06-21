@@ -70,12 +70,6 @@ library(tibble)
 library(lme4)
 library(RColorBrewer)
 library(here)
-#used to read in mothur-formatted files
-#library(phangorn)
-#The phyloseq package seeks to address issues with multiple microbiome analysis packages by providing a set of functions that internally manage the organizing, linking, storing, and analyzing of phylogenetic sequencing data. In general, this package is used for UniFrac analyses.
-#library(phyloseq)
-#Pretty Venn disgrams
-#library(VennDiagram)
 ```
 
 <!-- resources -->
@@ -109,12 +103,7 @@ qc_reads_fp <- here("Data", "reads.log")
 
 read_lengths_fp <- here("Data", "trim_len.tsv")
 
-r_trim_fp <- here("Data", "r_trimmed_removed_counts.txt")
-f_trim_fp <- here("Data", "f_trimmed_removed_counts.txt")
-
-r_seq_fp <- here("Data", "top_r_seqs_trimmed.txt")
-f_seq_fp <- here("Data", "top_f_seqs_trimmed.txt")
-
+trimmed_seq_fp <- here("Data", "trimmed_seq.tsv")
 
 ```
 
@@ -188,17 +177,6 @@ if (!all(rownames(counts) == ta$`Sequence`)) {
   stop (simpleError("The order of the features in the table and classifications don't match"))
 }
 adf <- split_assignments(ta$Classification) 
-
-# ### pipits taxonomic assignment
-# ta <- readr::read_delim(feature_table_fp, skip=1, delim="\t", quote = "") %>%
-#   select(`#OTU ID`, taxonomy) %>%
-#   arrange(order(match(rownames(counts), `#OTU ID`)))
-# 
-# ### check if the order of the assignments and the order of featue table is the same
-# if (!all(rownames(counts) == ta$`#OTU ID`)) {
-#   stop (simpleError("The order of the features in the table and classifications don't match"))
-# }
-# adf <- split_assignments(ta$taxonomy) 
 
 ### remove contamination
 is_mitochondrial <- grepl("mitochondria", adf$Family)
@@ -360,20 +338,17 @@ read_lengths %>%
 
 ```
 
+
 ## Number of reads removed after trimming
 
 ```{r trim zero}
 
-reads_trimmed_away <- read_delim(r_trim_fp, delim = " ", col_names = FALSE) %>%
-  mutate(primer = "Reverse primer") %>%
-  rbind(read_delim(f_trim_fp, delim = " ", col_names = FALSE) %>% mutate(primer = "Forward primer")) %>%
-  mutate(primer = factor(primer, levels = c("Reverse primer", "Forward primer"))) %>%
-  dplyr::rename(counts = "X1") %>%
-  dplyr::rename(SampleID = "X2") %>%
-  mutate(counts = as.numeric(gsub(" ", "", counts))) %>%
-  merge(select(s, SampleID, SampleType), by = "SampleID", all.x = TRUE)
-
-reads_trimmed_away %>%
+read_lengths %>%
+  filter(length == 0) %>%
+  group_by(SampleID, primer) %>%
+  mutate(counts = n()) %>%
+  ungroup() %>%
+  unique() %>%
   ggplot(aes(x = SampleType, y = counts, color = SampleType)) +
     geom_boxplot() +
     ggbeeswarm::geom_quasirandom() +
@@ -385,29 +360,35 @@ reads_trimmed_away %>%
     theme(axis.text.x=element_text(angle=-25, hjust= .1))
 
 ```
+
+
 \newpage
-## Top 10 reads by aligned by vsearch in non-control samples
+## Top sequences matched by primer trim
 Reverse primer sequence: GCTGCGTTCTTCATCGATGC (GCATCGATGAAGAACGCAGC) \newline
 Forward primer sequence: CTTGGTCATTTAGAGGAAGTAA (TTACTTCCTCTAAATGACCAAG)
 
 ```{r top ten}
 
-nth_char = 55
+trimmed_seq <- read_delim(trimmed_seq_fp, delim = "\t", col_names = TRUE) %>%
+  filter(trim_type != "match_type") %>%
+  merge(select(s, SampleID, SampleType), by = "SampleID", all.x = TRUE) %>%
+  group_by(SampleType, trim_type, direction, trim_pos, sequence) %>%
+  summarize(total_counts = sum(count)) %>%
+  ungroup() %>%
+  group_by(SampleType, trim_type, direction) %>%
+  slice_max(total_counts, n = 3) %>%
+  ungroup() %>%
+  filter(total_counts != 1) %>%
+  arrange(SampleType, trim_type, direction, total_counts) %>%
+  rename(dir = "direction", `position` = "trim_pos", `counts` = "total_counts") %>%
+  mutate(dir = ifelse(dir == "forward", "for", "rev"))
 
-top_ten <- read_delim(r_seq_fp, delim = " ", col_names = FALSE) %>%
- mutate(primer = "Reverse") %>%
- rbind(read_delim(f_seq_fp, delim = " ", col_names = FALSE) %>% mutate(primer = "Forward")) %>%
- dplyr::rename(counts = "X1") %>%
- dplyr::rename(Read = "X2") %>%
- mutate(counts = as.numeric(gsub(" ", "", counts))) %>%
- select(Read, counts, primer) %>%
- #place space after every nth character
- mutate(Read = sub("\\s+$", "", gsub(paste0('(.{', nth_char, '})'), '\\1 ', Read)))
 
-pandoc.table(top_ten, split.cells = nth_char)
+pandoc.table(trimmed_seq)
 
 
 ```
+
 \newpage
 ## Histogram of high quality paired reads per sample
 The black dashed vertical line shows the minimum number of reads (`r min_reads`) for analysis. Control samples, if any, were included in the histogram.

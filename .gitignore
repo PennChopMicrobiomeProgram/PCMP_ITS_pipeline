@@ -5,7 +5,6 @@ reads/
 otu/
 dnabc/
 primertrim/
-okfasta/
 scripts/__pycache__/
 .snakemake/
 snakejob*

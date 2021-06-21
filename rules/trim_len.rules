@@ -1,192 +1,77 @@
 ##get lengths of sequnces that were trimmed
-rule fq2fa_r:
+rule get_trimmed_len_r:
     input:
-        PRIMER_TRIM_FP + "/{sample}_r_trimmed.fastq"
+        PRIMER_TRIM_FP + "/{sample}_r_trimmed.log"
     output:
-        FASTA_DIR + "/{sample}_r_trimmed.fasta"
-    shell:
-        """
-        module load seqtk && \
-        seqtk seq -a {input} > {output}
-        """
-
-rule get_trim_r_len:
-    input:
-        FASTA_DIR + "/{sample}_r_trimmed.fasta"
-    output:
-        PRIMER_TRIM_FP + "/alignment_r/{sample}/trim_r_len_temp.tsv"
+        PRIMER_TRIM_FP + "/{sample}_r_trimmed_len.txt"
     params:
         samp_name = "{sample}".strip()
     shell:
         """
-        okfasta length --input {input} | awk '{{print "{params.samp_name}\t"$0"\treverse"}}' > {output}
+        tail -n +2 {input} | cut -f3 | awk '{{print "{params.samp_name}\t"$0"\treverse"}}' > {output}
         """
 
-rule get_trim_r_len_zeros:
+rule get_trimmed_len_f:
     input:
-        PRIMER_TRIM_FP + "/alignment_r/{sample}/trim_r_len_temp.tsv"
+        PRIMER_TRIM_FP + "/{sample}_rf_trimmed.log"
     output:
-        PRIMER_TRIM_FP + "/alignment_r/{sample}/trim_r_len.tsv"
-    params:
-        hits = PRIMER_TRIM_FP + "/alignment_r/{sample}/vsearch_hits.txt",
-        samp_name = "{sample}".strip()
-    shell:
-        """
-        awk '$7 == 1' {params.hits} | cut -f1 | awk '{{print "{params.samp_name}\t"$0"\t0\treverse"}}' >> {input} && \
-        mv {input} {output}
-        """
-
-rule get_trim_f_len:
-    input:
-        FASTA_DIR + "/{sample}.fasta"
-    output:
-        PRIMER_TRIM_FP + "/alignment_rf/{sample}/trim_f_len_temp.tsv"
+        PRIMER_TRIM_FP + "/{sample}_rf_trimmed_len.txt"
     params:
         samp_name = "{sample}".strip()
     shell:
         """
-        okfasta length --input {input} | awk '{{print "{params.samp_name}\t"$0"\tforward"}}' > {output}
-        """
-
-rule get_trim_f_len_zeros:
-    input:
-        PRIMER_TRIM_FP + "/alignment_rf/{sample}/trim_f_len_temp.tsv"
-    output:
-        PRIMER_TRIM_FP + "/alignment_rf/{sample}/trim_f_len.tsv"
-    params:
-        hits = PRIMER_TRIM_FP + "/alignment_rf/{sample}/vsearch_hits.txt",
-        samp_name = "{sample}".strip()
-    shell:
-        """
-        awk '$7 == 1' {params.hits} | cut -f1 | awk '{{print "{params.samp_name}\t"$0"\t0\tforward"}}' >> {input} && \
-        mv {input} {output}
+        tail -n +2 {input} | cut -f3 | awk '{{print "{params.samp_name}\t"$0"\tforward"}}' > {output}
         """
 
 rule get_trimmings:
     input:
-        [expand(PRIMER_TRIM_FP + "/alignment_rf/{sample}/trim_f_len.tsv", sample = SAMPLE_IDS) +
-         expand(PRIMER_TRIM_FP + "/alignment_r/{sample}/trim_r_len.tsv", sample = SAMPLE_IDS)]
+        [expand(PRIMER_TRIM_FP + "/{sample}_r_trimmed_len.txt", sample = SAMPLE_IDS) +
+         expand(PRIMER_TRIM_FP + "/{sample}_rf_trimmed_len.txt", sample = SAMPLE_IDS)]
     output:
         READ_DIR + "/trim_len.tsv"
-    params:
-        READ_DIR + "/trim_len_all.tsv"
     shell:
         """
-        echo "SampleID\tReadID\tlength\tdirection" > {params} && \
-        cat {input} >> {params}
-        cut -f1,3,4 {params} > {output}
+        echo "SampleID\tlength\tdirection" > {output} && \
+        cat {input} >> {output}
         """
-
-def get_lines(fp):
-  with open(fp) as myfile:
-    return sum(1 for line in myfile)
 
 ##get top sequences from non-control samples that were trimmed by alignment
-import re
-
-rule most_common_r_trimmed:
+rule trim_match_r:
     input:
-        PRIMER_TRIM_FP + "/alignment_r/{sample}/query.fa"
+        PRIMER_TRIM_FP + "/{sample}_r_trimmed.log"
     output:
-        PRIMER_TRIM_FP + "/alignment_r/{sample}/vsearch_grep.txt"
+        PRIMER_TRIM_FP + "/{sample}_r_trimmed_matches.txt"
     params:
-        PRIMER_TRIM_FP + "/alignment_r/{sample}/vsearch_hits.txt"
-    run:
-        if ((get_lines(params[0]) > 0) & (not bool(re.search('(vibriolambda|mockdna|geneblock|ebneg|blank|extract|dnafreewater)', wildcards.sample, re.IGNORECASE)))):
-            with open(params[0]) as myfile:
-                for line in myfile:
-                    stripped_line = line.strip().split("\t")[0]
-                    shell("""
-                    okfasta searchdesc --input {input} {stripped_line} >> {output}
-                    """)
-        else:
-            shell("""
-            touch {output}
-            """)
-
-rule most_common_f_trimmed:
-    input:
-        PRIMER_TRIM_FP + "/alignment_rf/{sample}/query.fa"
-    output:
-        PRIMER_TRIM_FP + "/alignment_rf/{sample}/vsearch_grep.txt"
-    params:
-        PRIMER_TRIM_FP + "/alignment_rf/{sample}/vsearch_hits.txt"
-    run:
-        if ((get_lines(params[0]) > 0) & (not bool(re.search('(vibriolambda|mockdna|geneblock|ebneg|blank|extract|dnafreewater)', wildcards.sample, re.IGNORECASE)))):
-            with open(params[0]) as myfile:
-                for line in myfile:
-                    stripped_line = line.strip().split("\t")[0]
-                    shell("""
-                    okfasta searchdesc --input {input} {stripped_line} >> {output}
-                    """)
-        else:
-            shell("""
-            touch {output}
-            """)
-
-rule top_ten_r_trimmed:
-    input:
-        expand(PRIMER_TRIM_FP + "/alignment_r/{sample}/vsearch_grep.txt", sample = SAMPLE_IDS)
-    output:
-        READ_DIR + "/top_r_seqs_trimmed.txt"
-    shell:
-        """
-        cat {input} | grep ">" -v | sort | uniq -c | sort -nr | sed -n 1,10p > {output}
-        """
-
-rule top_ten_f_trimmed:
-    input:
-        expand(PRIMER_TRIM_FP + "/alignment_rf/{sample}/vsearch_grep.txt", sample = SAMPLE_IDS)
-    output:
-        READ_DIR + "/top_f_seqs_trimmed.txt"
-    shell:
-        """
-        cat {input} | grep ">" -v | sort | uniq -c | sort -nr | sed -n 1,10p > {output}
-        """
-
-##count number reads from each sample that were trimmed away completely
-rule find_first_index_r:
-    input:
-        PRIMER_TRIM_FP + "/alignment_r/{sample}/query.fa"
-    output:
-        PRIMER_TRIM_FP + "/alignment_r/{sample}/first_index.txt"
-    params:
-        hits = PRIMER_TRIM_FP + "/alignment_r/{sample}/vsearch_hits.txt",
         samp_name = "{sample}".strip()
     shell:
         """
-        awk '$7 == 1' {params.hits} | cut -f1 | awk '{{print "{params.samp_name}\t"$0}}' > {output}
+        grep -vE "No match" {input} | \
+        cut -f2,3,5 | sort | uniq -c | sed 's/^\s\+//g' | sed 's/\s/\t/g' | \
+        awk '{{print "{params.samp_name}\t"$0"\treverse"}}' > {output}
         """
 
-rule r_reads_removed_count:
+rule trim_match_f:
     input:
-        expand(PRIMER_TRIM_FP + "/alignment_r/{sample}/first_index.txt", sample = SAMPLE_IDS)
+        PRIMER_TRIM_FP + "/{sample}_rf_trimmed.log"
     output:
-        READ_DIR + "/r_trimmed_removed_counts.txt"
-    shell:
-        """
-        cat {input} | cut -f1 | sort | uniq -c > {output}
-        """
-
-rule find_first_index_f:
-    input:
-        PRIMER_TRIM_FP + "/alignment_rf/{sample}/query.fa"
-    output:
-        PRIMER_TRIM_FP + "/alignment_rf/{sample}/first_index.txt"
+        PRIMER_TRIM_FP + "/{sample}_rf_trimmed_matches.txt"
     params:
-        hits = PRIMER_TRIM_FP + "/alignment_rf/{sample}/vsearch_hits.txt",
         samp_name = "{sample}".strip()
     shell:
         """
-        awk '$7 == 1' {params.hits} | cut -f1 | awk '{{print "{params.samp_name}\t"$0}}' > {output}
+        grep -vE "No match" {input} | \
+        cut -f2,3,5 | sort | uniq -c | sed 's/^\s\+//g' | sed 's/\s/\t/g' | \
+        awk '{{print "{params.samp_name}\t"$0"\tforward"}}' > {output}
         """
 
-rule f_reads_removed_count:
+rule count_trimmings:
     input:
-        expand(PRIMER_TRIM_FP + "/alignment_rf/{sample}/first_index.txt", sample = SAMPLE_IDS)
+        [expand(PRIMER_TRIM_FP + "/{sample}_r_trimmed_matches.txt", sample = SAMPLE_IDS) +
+         expand(PRIMER_TRIM_FP + "/{sample}_rf_trimmed_matches.txt", sample = SAMPLE_IDS)]
     output:
-        READ_DIR + "/f_trimmed_removed_counts.txt"
+        READ_DIR + "/trimmed_seq.tsv"
     shell:
         """
-        cat {input} | cut -f1 | sort | uniq -c > {output}
+        echo "SampleID\tcount\ttrim_type\ttrim_pos\tsequence\tdirection" > {output} && \
+        cat {input} >> {output}
         """
