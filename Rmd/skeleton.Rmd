@@ -307,14 +307,15 @@ qc <- read_delim(qc_reads_fp, delim = "\t", col_names = FALSE) %>%
   fill(initial_reads, .direction = "downup") %>%
   ungroup() %>%
   mutate(perc_reads = ifelse(initial_reads != 0, counts/initial_reads, 0)) %>%
-  merge(select(s, SampleID, SampleType), by = "SampleID", all.x = TRUE)
+  merge(select(s, SampleID, SampleType, Keep), by = "SampleID", all.x = TRUE) %>%
+  filter(Keep)
 
 qc %>%
   ggplot(aes(y = perc_reads, x = trim_stage, group = SampleID)) +
     geom_line(aes(color = SampleType)) +
     geom_point(aes(fill = SampleType), shape = 21) +
     facet_wrap(~direction, ncol = 1) +
-    scale_y_continuous(labels = scales::percent) +
+    scale_y_continuous(labels = scales::percent, limits = c(0, 1)) +
     labs(y = "Percent of reads kept", x = "Trimming stage") +
     theme(axis.text.x=element_text(angle=-25, hjust= .1))
 
@@ -329,7 +330,7 @@ read_lengths <- read_delim(read_lengths_fp, delim = "\t", col_names = TRUE) %>%
   merge(select(s, SampleID, SampleType), by = "SampleID", all.x = TRUE)
 
 read_lengths %>%
-  ggplot(aes(x = length, color = SampleType)) +
+  ggplot(aes(x = length, fill = SampleType)) +
     geom_histogram(boundary = TRUE) +
     theme_classic() +
     theme_bw() + 
@@ -341,7 +342,7 @@ read_lengths %>%
 
 ## Number of reads removed after trimming
 
-```{r trim zero}
+```{r trim zero, eval = FALSE}
 
 read_lengths %>%
   filter(length == 0) %>%
