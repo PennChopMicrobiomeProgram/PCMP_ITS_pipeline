@@ -15,6 +15,7 @@ trim:
   r_primer: GCTGCGTTCTTCATCGATGC
   mismatch: 2
   min_length: 15
+  align_id: 0.85
 
 otu:
   expected_error: 1

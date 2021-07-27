@@ -19,7 +19,6 @@ pip install brocc #brocc needs to be installed with pip in the environment
 - The following software also need to be installed:
   - `dnabc` (https://github.com/PennChopMicrobiomeProgram/dnabc)
   - `primertrim` (https://github.com/PennChopMicrobiomeProgram/primertrim)
-  - `okfasta` (https://github.com/kylebittinger/okfasta)
   - To install (dnabc as example):
   ```bash
   git clone https://github.com/PennChopMicrobiomeProgram/dnabc
@@ -47,7 +46,8 @@ To run the pipeline, we need
   - **trim: f_primer**: Sequence of forward primer used for ITS PCR
   - **trim: r_primer**: Sequence of reverse primer used for ITS PCR
   - **trim: mismatch**: Number of allowable basepair mismatches on ITS PCR primers for trimming
-  - **trim: min_length**: Minimum length of primer to trim from reads
+  - **trim: min_length**: Minimum length of match during the partial matching stage
+  - **trim: align_id**: Minimum percent identity to consider a primer match in vsearch alignment
   - **otu: expected_error**: Threshold for truncating reads 
   - **otu: otu_id**: Percent sequence identity for clustering reads into OTUs
   - **otu: threads**: Number of threads to use
