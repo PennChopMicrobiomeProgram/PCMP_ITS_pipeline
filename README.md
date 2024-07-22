@@ -18,6 +18,7 @@ conda install --name PCMP_ITS_pipeline --file requirements.txt
 - The following software also need to be installed:
   - `dnabc` (https://github.com/PennChopMicrobiomeProgram/dnabc)
   - `primertrim` (https://github.com/PennChopMicrobiomeProgram/primertrim)
+  - `brocc` (https://github.com/kylebittinger/brocc)
   - To install (dnabc as example):
   ```bash
   git clone https://github.com/PennChopMicrobiomeProgram/dnabc
