@@ -21,10 +21,11 @@ rule brocc:
     otu = OTU_DIR + "/otu.fasta",
     blast = BL_BR_DIR + "/out_blast/otu_fasta.blastout"
   params:
-    BL_BR_DIR + "/out_brocc"
+    outdir = BL_BR_DIR + "/out_brocc",
+    dbpath = config["brocc"]["taxonomy_db"]
   output:
     BL_BR_DIR + "/out_brocc/brocc.log"
   shell:
     """
-    brocc.py -i {input.otu} -b {input.blast} -o {params} --min_species_id 95.2 --min_genus_id 83.05
+    brocc.py -i {input.otu} -b {input.blast} -o {params.outdir} --min_species_id 95.2 --min_genus_id 83.05 --taxonomy_db {params.dbpath}
     """
