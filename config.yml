@@ -8,7 +8,7 @@ all:
 
 demux:
     mismatch: 0
-    revcomp: TRUE
+    revcomp: FALSE
 
 trim:
   f_primer: CTTGGTCATTTAGAGGAAGTAA
@@ -24,4 +24,7 @@ otu:
   chimera_db: #leave blank if using mockdna positive controls
 
 blastn:
-  ncbi_db: "/mnt/isilon/microbiome/analysis/biodata/blast/nt_20180816/nt"
+  ncbi_db: "/mnt/isilon/microbiome/analysis/biodata/blast/nt_20240612/nt"
+
+brocc:
+  taxonomy_db: "/mnt/isilon/microbiome/analysis/biodata/brocc_nt_database/taxonomy.db"
