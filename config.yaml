@@ -1,0 +1,64 @@
+# Default options for running PCMP_ITS_pipeline with slurm
+rerun-incomplete: True
+rerun-triggers: "mtime"
+latency-wait: 90
+jobs: 100
+keep-going: True
+notemp: True
+printshellcmds: True
+nolock: True
+verbose: True
+cores: 24 # 'all' uses all available cores, you can also specify a number
+cluster: "sbatch \
+          --account={resources.account} \
+          --partition={resources.partition} \
+          --mem={resources.mem_mb} \
+          --cpus-per-task={threads} \
+          --time={resources.runtime} \
+          --job-name={rule} \
+          --output=slurm_%x_%j.out"
+
+# Default resource configuration
+default-resources:
+  - account="hpcusers"
+  - partition="defq"
+  - runtime=120
+  - mem_mb=4000
+  - disk_mb=1000
+# set-threads: map rule names to threads
+set-threads:
+  - blastn=8
+  - all_derep=8
+  - cluster=8
+  - sort_centroids=8
+  - ref_chimera=8
+  - cat_OTU=8
+  - map_back=8
+  - trim_r=8
+  - trim_f=8
+# set-resources: map rule names to resources in general
+set-resources:
+  - run_dnabc:mem_mb=8000
+  - run_dnabc:runtime=480
+  - trim_r:mem_mb=32000
+  - trim_r:runtime=720
+  - trim_f:mem_mb=32000
+  - trim_f:runtime=720
+  - cluster:mem_mb=16000
+  - cluster:runtime=480
+  - ref_chimera:mem_mb=8000
+  - ref_chimera:runtime=720
+  - map_back:mem_mb=8000
+  - map_back:runtime=720
+  - blastn:mem_mb=24000
+  - blastn:runtime=720
+  - brocc:mem_mb=24000
+  - brocc:runtime=720
+  - fq2fa_r:mem_mb=24000
+  - fq2fa_r:runtime=720
+  - get_trimmings:mem_mb=24000
+  - get_trimmings:runtime=720
+  - count_trimmings:mem_mb=24000
+  - count_trimmings:runtime=720
+
+configfile: "your/directory/to/project_config.yml"

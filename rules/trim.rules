@@ -10,8 +10,9 @@ rule trim_r:
         rev = config["trim"]["r_primer"],
         min_length = config["trim"]["min_length"],
         align_fp = PRIMER_TRIM_FP + "/alignment_r/{sample}",
-        align_id = config["trim"]["align_id"],
-        threads = config["all"]["threads"]
+        align_id = config["trim"]["align_id"]
+    threads:
+        1
     output:
         trim_fp = PRIMER_TRIM_FP + "/{sample}_r_trimmed.fastq",
         log_fp = PRIMER_TRIM_FP + "/{sample}_r_trimmed.log",
@@ -31,7 +32,7 @@ rule trim_r:
           --alignment \
           --alignment-dir {params.align_fp} \
           --align_id {params.align_id} \
-          --threads {params.threads} && \
+          --threads {threads} && \
         wc -l {output.trim_fp} | awk '{{x=$1/4; print x"\t"$2}}' > {output.trim_read_fp}
         """
 
@@ -43,8 +44,9 @@ rule trim_f:
         fwd = config["trim"]["f_primer"],
         min_length = config["trim"]["min_length"],
         align_fp = PRIMER_TRIM_FP + "/alignment_rf/{sample}",
-        align_id = config["trim"]["align_id"],
-        threads = config["all"]["threads"]
+        align_id = config["trim"]["align_id"]
+    threads:
+        1
     output:
         trim_fp = PRIMER_TRIM_FP + "/{sample}_rf_trimmed.fastq",
         log_fp = PRIMER_TRIM_FP + "/{sample}_rf_trimmed.log",
@@ -62,7 +64,7 @@ rule trim_f:
           --alignment \
           --alignment-dir {params.align_fp} \
           --align_id {params.align_id} \
-          --threads {params.threads} && \
+          --threads {threads} && \
         wc -l {output.trim_fp} | awk '{{x=$1/4; print x"\t"$2}}' > {output.trim_read_fp}
         """
 

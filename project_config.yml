@@ -1,8 +1,7 @@
 all:
-  project_dir: "/my/project/directory"
+  project_dir: "/scr1/users/username/project"
   mux_dir: "multiplexed_fastq" #directory that holds multiplexed data or leave blank if files already demultiplexed
   demux_dir:  #leave blank to demultiplex or full path to demultiplexed gunzipped fastq files
-  threads: 4
   mapping_file: "mapping_file.tsv" #relative to project_dir
   forward_direction: TRUE #If TRUE, use the forward reads; else, use reverse
 
@@ -20,7 +19,6 @@ trim:
 otu:
   expected_error: 1
   otu_id: 0.99
-  threads: 8
   chimera_db: #leave blank if using mockdna positive controls
 
 blastn:

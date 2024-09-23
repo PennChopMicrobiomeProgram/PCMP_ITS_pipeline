@@ -20,7 +20,7 @@ rule run_dnabc:
             shell("""
             mkdir -p {params.reads_dir}
             touch {output}
-            dnabc.py \
+            dnabc \
             --revcomp \
             --output-dir {params.demux_dir} \
             --mismatches {params.mismatch} \
@@ -32,7 +32,7 @@ rule run_dnabc:
             shell("""
             mkdir -p {params.reads_dir}
             touch {output}
-            dnabc.py \
+            dnabc \
             --output-dir {params.demux_dir} \
             --mismatches {params.mismatch} \
             --manifest-file {params.manifest_fp} \

@@ -11,23 +11,11 @@
 source ~/.bashrc.conda #needed to make "conda" command to work
 conda activate PCMP_ITS_pipeline
 
-set -xeuo pipefail
-
-if [ $# -ne 1 ]; then
-    echo "Usage: bash $0 PATH_TO_CONFIG"
+if [[ ! -f ./config.yaml ]]; then
+    echo "Must have a config.yaml to be able to run"
     exit 1
 fi
 
-CONFIG_FP=$1
+set -xeuo pipefail
 
-snakemake \
-    --jobs 100 \
-    --nolock \
-    --configfile ${CONFIG_FP} \
-    --cluster-config cluster.json \
-    --keep-going \
-    --latency-wait 90 \
-    --notemp \
-    --printshellcmds \
-    --cluster \
-    "sbatch --no-requeue --export=ALL --mem={cluster.memcpu} -n {threads} -t 2-0 -J {cluster.name} --output=slurm_%x_%j.out"
+snakemake --profile ./

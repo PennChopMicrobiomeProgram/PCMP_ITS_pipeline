@@ -8,7 +8,7 @@ rule blastn:
   params:
     config["blastn"]["ncbi_db"]
   threads:
-    config["all"]["threads"]
+    1
   output:
     BL_BR_DIR + "/out_blast/otu_fasta.blastout"
   shell:
