@@ -46,12 +46,9 @@ rule all_derep:
     output:
         uc = OTU_DIR + "/all_derep.uc",
         out = OTU_DIR + "/all_derep.fasta"
-    threads:
-        1
     shell:
         """
         vsearch --derep_fulllength {input} \
-            --threads {threads} \
             --sizein \
             --sizeout \
             --fasta_width 0 \
@@ -85,12 +82,9 @@ rule sort_centroids:
         OTU_DIR + "/centroids.fasta"
     output:
         OTU_DIR + "/centroids_sorted.fasta"
-    threads:
-        1
     shell:
         """
         vsearch --sortbysize {input} \
-            --threads {threads} \
             --sizein \
             --sizeout \
             --fasta_width 0 \
@@ -140,12 +134,9 @@ rule cat_OTU:
         OTU_DIR + "/nonchimeras.fasta" if config["otu"]["chimera_db"] else OTU_DIR + "/denovo.nonchimeras.fasta"
     output:
         OTU_DIR + "/otu.fasta"
-    threads:
-        1
     shell:
         """
         vsearch --fastx_filter {input} \
-            --threads {threads} \
             --sizein \
             --sizeout \
             --fasta_width 0 \
