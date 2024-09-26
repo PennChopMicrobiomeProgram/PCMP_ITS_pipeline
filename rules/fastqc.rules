@@ -3,7 +3,7 @@ rule pre_fastqc:
     input:
         reads=expand(DEMUX_DIR + "/{sample}_{direction}.fastq", sample = SAMPLE_IDS, direction = ["R1", "R2"]),
     output:
-        expand(PRE_FASTQC_DIR / "reports" / "{sample}_{direction}_fastqc/fastqc_data.txt", sample = SAMPLE_IDS, direction = ["R1", "R2"]),
+        expand(PRE_FASTQC_DIR + "/reports" + "/{sample}_{direction}_fastqc/fastqc_data.txt", sample = SAMPLE_IDS, direction = ["R1", "R2"]),
     shell:
         """
         sample_dir=$(dirname {output[0]})
@@ -16,8 +16,8 @@ rule pre_fastqc:
 rule pre_fastqc_report:
     """ make fastqc reports """
     input:
-        files=expand(PRE_FASTQC_DIR / "reports" / "{sample}_{direction}_fastqc/fastqc_data.txt", sample = SAMPLE_IDS, direction = ["R1", "R2"]),
+        files=expand(PRE_FASTQC_DIR + "/reports" + "/{sample}_{direction}_fastqc/fastqc_data.txt", sample = SAMPLE_IDS, direction = ["R1", "R2"]),
     output:
-        PRE_FASTQC_DIR / "reports" / "fastqc_quality.tsv",
+        PRE_FASTQC_DIR + "/reports" + "/fastqc_quality.tsv",
     script:
         "../scripts/fastqc_report.py"
