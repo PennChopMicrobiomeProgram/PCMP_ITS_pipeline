@@ -1,7 +1,7 @@
 
 rule pre_fastqc:
     input:
-        reads=expand(DEMUX_DIR + "/{sample}_{direction}.fastq", sample = SAMPLE_IDS, direction = ["R1", "R2"]),
+        expand(DEMUX_DIR + "/{sample}_{direction}.fastq", sample = SAMPLE_IDS, direction = ["R1", "R2"]),
     output:
         expand(PRE_FASTQC_DIR + "/reports" + "/{sample}_{direction}_fastqc/fastqc_data.txt", sample = SAMPLE_IDS, direction = ["R1", "R2"]),
     shell:
@@ -9,7 +9,7 @@ rule pre_fastqc:
         sample_dir=$(dirname {output[0]})
         outdir=$(dirname $sample_dir)
 
-        fastqc -o $outdir {input.reads} -extract
+        fastqc -o $outdir {input} -extract
         """
 
 
