@@ -5,9 +5,9 @@ if config["all"]["forward_direction"]:
 else:
   TARGET_TRIM_QUAL = expand(TRIM_QUAL_DIR + "/{sample}_R2.fastq", sample = SAMPLE_IDS)
 
-TARGET_PRE_FASTQC = [str(PRE_FASTQC_DIR) + "/fastqc_quality.tsv"]
+TARGET_PRE_FASTQC = [str(PRE_FASTQC_DIR) + "/fastqc_quality_report.tsv"]
 
-TARGET_POST_FASTQC = [str(POST_FASTQC_DIR) + "/fastqc_quality.tsv"]
+TARGET_POST_FASTQC = [str(POST_FASTQC_DIR) + "/fastqc_quality_report.tsv"]
 
 TARGET_TRIM = expand(PRIMER_TRIM_FP + "/{sample}_rf_trimmed.fastq", sample = SAMPLE_IDS)
 
