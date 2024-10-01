@@ -4,7 +4,7 @@ if config["all"]["forward_direction"]:
 
 rule trim_r:
     input:
-        DEMUX_DIR + "/{sample}_R" + dir + ".fastq"
+        TRIM_QUAL_DIR + "/{sample}_R" + dir + ".fastq"
     params:
         mismatch = config["trim"]["mismatch"],
         rev = config["trim"]["r_primer"],

@@ -28,11 +28,8 @@ default-resources:
 # set-threads: map rule names to threads
 set-threads:
   - blastn=8
-  - all_derep=8
   - cluster=8
-  - sort_centroids=8
   - ref_chimera=8
-  - cat_OTU=8
   - map_back=8
   - trim_r=8
   - trim_f=8
@@ -61,4 +58,4 @@ set-resources:
   - count_trimmings:mem_mb=24000
   - count_trimmings:runtime=720
 
-configfile: "your/directory/to/project_config.yml"
+configfile: "/scr1/users/danielsg/CHOPMC-392_Liu_ITS/Scripts/HPC_cluster/PCMP_ITS_pipeline/project_config.yml"

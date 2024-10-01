@@ -18,3 +18,5 @@ manifest.csv
 .Rhistory
 test_config.yml
 total_read_counts.tsv
+*.out
+test/

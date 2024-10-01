@@ -1,5 +1,14 @@
 TARGET_DEMUX = expand(DEMUX_DIR + "/{sample}_{direction}.fastq", sample = SAMPLE_IDS, direction = ["R1", "R2"])
 
+if config["all"]["forward_direction"]:
+  TARGET_TRIM_QUAL = expand(TRIM_QUAL_DIR + "/{sample}_R1.fastq", sample = SAMPLE_IDS)
+else:
+  TARGET_TRIM_QUAL = expand(TRIM_QUAL_DIR + "/{sample}_R2.fastq", sample = SAMPLE_IDS)
+
+TARGET_PRE_FASTQC = [str(PRE_FASTQC_DIR) + "/fastqc_quality_report.tsv"]
+
+TARGET_POST_FASTQC = [str(POST_FASTQC_DIR) + "/fastqc_quality_report.tsv"]
+
 TARGET_TRIM = expand(PRIMER_TRIM_FP + "/{sample}_rf_trimmed.fastq", sample = SAMPLE_IDS)
 
 TARGET_OTU = [str(OTU_DIR) + "/otu_sorted.tsv"]
@@ -13,6 +22,9 @@ TARGET_TRIM_LEN = [str(READ_DIR) + "/trim_len.tsv",
 
 TARGET_ALL = (
   TARGET_DEMUX +
+  TARGET_TRIM_QUAL +
+  TARGET_PRE_FASTQC +
+  TARGET_POST_FASTQC +
   TARGET_TRIM +
   TARGET_OTU +
   TARGET_BL_BR +
