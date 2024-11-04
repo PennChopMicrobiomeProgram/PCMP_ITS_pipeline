@@ -1,0 +1,515 @@
+
+```{r, message=FALSE, warning=FALSE}
+library(here)
+library(tidyverse)
+library(qiimer)
+library(vegan)
+library(ape)
+library(usedist)
+
+## Visualization packages
+library(pander)
+library(kableExtra)
+library(ggplot2)
+library(pheatbuilder)
+library(ggbeeswarm)
+library(ggsci)
+library(viridis)
+library(wesanderson)
+library(RColorBrewer)
+library(ghibli)
+
+# stats packages
+library(adonisplus)
+library(nlme)
+library(emmeans) # for lmer post-hoc tests
+library(broom.mixed)
+library(taxafmt)
+library(usedist)
+library(jtools)
+```
+
+
+```{r functions}
+source(here("R_all_functions_v2.R"))
+
+theme_clean <- function(){ 
+    theme_bw() %+replace%    #replace elements we want to change
+    theme(
+      panel.grid = element_blank(), 
+      strip.background = element_blank()
+    )
+}
+```
+
+```{r constants}
+### minimum reads threshold
+min_reads <- 100
+### rarefying subsample size 
+richness_subsample_size <- 100
+### number of samples threshold to show heatmap on the page
+sample_threshold <- 100
+#mean prop cut
+prop_cut <- 0.01
+## The number of permutations to do for PERMANOVA. You can start with 99 permutations to run faster while developing the code, then change it to 999 permutations for higher resolution.
+perm <- 999
+## relative abundance cutoff for positive control sequences in samples
+pos_ctrl_threshold <- 0.1
+```
+
+```{r file paths}
+data_dir <- here("Data")
+# qpcr_fp <- "~/Documents/projects/CHOPMC233_Hong_ITS_2runs/Data/hong_qpcr_ITS_p1,2,3,4,5_results_06272024.xlsx"
+
+# User defined variables
+### mapping file path
+mapping_file_fp <- file.path(data_dir, "mapping_file.tsv")
+### demux counts file path
+demux_count_fp <- file.path(data_dir, "total_read_counts.tsv") # 0 mismatch
+### read quality
+pre_fastqc_fp = file.path(data_dir, "pre_fastqc", "fastqc_quality_report.tsv") # after trimming
+post_fastqc_fp = file.path(data_dir, "post_fastqc", "fastqc_quality_report.tsv") # after trimming
+### otu table file path
+feature_table_fp <- file.path(data_dir, "otu_sorted.tsv")
+### taxonomic assignment 
+taxo_assignment_fp <- file.path(data_dir, "brocc.log")
+### quality control
+qc_reads_fp <- file.path(data_dir, "reads.log")
+### trimmed sequences
+read_lengths_fp <- file.path(data_dir, "trim_len.tsv")
+### trimmed regions
+# trimmed_seq_fp <- file.path(data_dir, "trimmed_seq.tsv")
+trimmed_seq_fp <- file.path(data_dir, "all_rf_trimmed_matches.txt") #cat intermediates/primer_trim/*rf_trimmed_matches.txt > intermediates/primer_trim/all_rf_trimmed_matches.txt
+```
+
+```{r}
+### read mapping file
+
+### If you need to change the metadata / add columns do it here so it's consistent across analysis files!
+### Relevel factors here!
+# s <- read_qiime_mapping_file(mapping_file_fp) %>%
+#   mutate(isControl = grepl("emptywell|extractblank|extractempty|dnafree|geneblock|mockdna", SampleID, ignore.case = T), SampleType=gsub(pattern = '  ', replacement = ' ', tolower(as.character(SampleType))))
+```
+
+```{r load otus}
+### BROCC taxonomy
+brocc <- read.delim(taxo_assignment_fp)
+
+### read otu table
+counts <- readr::read_delim(feature_table_fp, delim="\t", quote = "") %>%
+  mutate_at(vars(-c(`#OTU ID`)), as.numeric) %>%
+  column_to_rownames(var = "#OTU ID") %>%
+  as.matrix()
+
+### get read counts
+read_counts <- colSums(counts) %>% 
+  as.data.frame() %>%
+  setNames(c("Read_Counts")) %>%
+  rownames_to_column(var="SampleID")
+
+### find the samples to keep
+# s <- merge(s, read_counts, by="SampleID", all.x=T) %>%
+#   mutate(Keep = ifelse(!is.na(Read_Counts), Read_Counts > min_reads, FALSE)) %>%
+#   mutate(isControl = grepl("EBneg.*|Extract.*|Vibriolambda.*|Blank.*|MockDNA.*|DNAfreewater.*|geneblock.*", SampleID, ignore.case = TRUE))
+
+### brocc taxonomic assignment
+ta <- read_delim(file=taxo_assignment_fp, delim="\t") %>%
+  select(Sequence, Classification) %>%
+  mutate(Size = gsub(".*;", "", Sequence), Sequence = gsub(";.*", "", Sequence)) %>%
+  mutate(Classification = sub("^Eukaryota;", "", Classification)) %>% # Remove superkingdom
+  mutate(taxafmt::split_lineage(Classification, pattern=";")) %>%
+  arrange(order(match(rownames(counts), `Sequence`)))
+
+### check if the order of the assignments and the order of featue table is the same
+if (!all(rownames(counts) == ta$`Sequence`)) {
+  stop (simpleError("The order of the features in the table and classifications don't match"))
+}
+adf <- taxafmt::split_lineage(ta$Classification, pattern=";") 
+rownames(adf) <- ta$`Sequence`
+
+### get read counts after demultiplexing
+demux <- read_tsv(file = demux_count_fp) %>%
+  setNames(c("SampleID", "demux_Read_Counts"))
+
+percent_unassigned <- demux %>%
+  mutate(isUnassigned = ifelse(SampleID == "unassigned", "Unassigned", "Samples")) %>%
+  group_by(isUnassigned) %>%
+  summarize(numReads = sum(demux_Read_Counts)) %>%
+  ungroup() %>%
+  mutate(total_reads = sum(numReads)) %>%
+  mutate(perc_reads = numReads / total_reads) %>%
+  filter(isUnassigned == "Samples")
+
+# get OTU counts before removing contamination
+denoise <- colSums(counts) %>%
+  enframe("SampleID", "denoise_Read_Counts")
+  
+### get read counts after removing contamination
+### remove contamination
+is_mitochondrial <- grepl("mitochondria", adf$Family)
+is_chloroplast <- grepl("Chloroplast", adf$Class)
+is_unassigned <- is.na(adf$Phylum)
+is_archaea <- grepl("Archaea", adf$Kingdom)
+is_contam <- is_mitochondrial | is_chloroplast | is_unassigned ### Archaea kept to check positive control samples
+counts <- counts[!is_contam,]
+counts <- counts[, colSums(counts) > 0]
+adf <- adf[!is_contam,]
+ta <- ta[!is_contam,]
+
+qc <- colSums(counts) %>%
+  enframe("SampleID", "QC_Read_Counts") 
+
+# s <- s %>%
+#   left_join(demux, by = "SampleID") %>%
+#   left_join(denoise, by = "SampleID") %>%
+#   left_join(qc, by = "SampleID") %>%
+#   mutate(above_min_reads = QC_Read_Counts > min_reads) %>%
+#   mutate(QC_read_call = factor(ifelse(above_min_reads, "above threshold", "below threshold"))) %>%
+#   mutate(Keep = !is.na(QC_Read_Counts) & QC_Read_Counts > min_reads)
+
+rm(is_mitochondrial, is_chloroplast, is_unassigned, is_archaea, is_contam)
+
+#this part needs to reflect the fungal positive controls in the run
+have_pos_ctrls <- any(c(grepl("Acanthastrea echinata", ta$Classification),
+                        grepl("Hydra vulgaris", ta$Classification),
+                        grepl("Luffa", ta$Classification)))
+
+### conventional relative abundance
+a <- simplify_assignments(adf, rank1="Phylum", rank2="Species")
+names(a) <- ta$`Sequence`
+summed_cts <- rowsum(counts, a) 
+summed_props <- sweep(summed_cts, 2, colSums(summed_cts), "/")
+
+#get only Kingdom and Phylum info
+a_p <- simplify_assignments(adf, rank1="Kingdom", rank2="Phylum")
+names(a) <- ta$`Sequence`
+summed_cts_p <- rowsum(counts, a_p) 
+summed_props_p <- sweep(summed_cts_p, 2, colSums(summed_cts_p), "/")
+
+#get only Phylum and Family info
+a_f <- simplify_assignments(adf, rank1="Phylum", rank2="Family")
+names(a_f) <- ta$`Sequence`
+summed_cts_f <- rowsum(counts, a_f) 
+summed_props_f <- sweep(summed_cts_f, 2, colSums(summed_cts_f), "/")
+
+#get only Phylum and Genus info
+a_g <- simplify_assignments(adf, rank1="Phylum", rank2="Genus")
+names(a_g) <- ta$`Sequence`
+summed_cts_g <- rowsum(counts, a_g) 
+summed_props_g <- sweep(summed_cts_g, 2, colSums(summed_cts_g), "/")
+
+#annotate feature table with Taxa
+# all_otus <- counts %>%
+#   merge(ta[,c("Sequence","Classification")], by.x="row.names", by.y="Sequence", all.x=T) %>%
+#   dplyr::rename(Taxon = Classification) %>%
+#   dplyr::rename(`Sequence` = Row.names)
+# write.csv(x = all_otus, file = "all_otus.csv", row.names = F)
+
+```
+
+```{r sample_sheet_import and columns, echo=FALSE}
+lookup <- c(subject_id = "SubjectID",
+            host_species = "HostSpecies",
+            SampleType = "SampleType",
+            final_library_conc_ng_ul = "final_library_concentration_ng_ul")
+ctrl_regex <- "^EBneg.*|^Extract.*|^Vibriolambda.*|^Blank.*|^MockDNA.*|^DNAfreewater.*|^Geneblock.*|^Emptywell.*|^Mock.*"
+
+s <- read.delim(mapping_file_fp, sep='\t', header = T,stringsAsFactors = F) %>%
+  rename(SampleID=`X.SampleID`) %>%
+  mutate(Copy_Numb = str_remove_all(Copy_Numb, ",")) %>%
+  mutate(Copy_Numb = as.numeric(Copy_Numb)) %>%
+  merge(read_counts, by="SampleID", all.x=T) %>%
+  merge(demux, by="SampleID", all.x=T) %>%
+  mutate(Keep = Read_Counts > min_reads) %>%
+  mutate(Keep = ifelse(!SampleID %in% colnames(counts), FALSE, Keep)) %>%
+  mutate(Keep = ifelse(is.na(Read_Counts), FALSE, Keep)) %>%
+  mutate(isControl = grepl(ctrl_regex, SampleID, ignore.case = TRUE)) %>% 
+  merge(data.frame(otu_counts= colSums(summed_cts)), by.x="SampleID", by.y="row.names", all.x=T) %>%
+  ###get alpha diversities
+  merge(vegan::diversity(t(counts)), by.x="SampleID", by.y="row.names", all.x=T) %>%
+  dplyr::rename(shannon = y) %>%
+  merge(rarefy(t(counts), richness_subsample_size), by.x="SampleID", by.y="row.names", all.x=T) %>%
+  dplyr::rename(richness = y) %>%
+  droplevels() %>%
+  select(-starts_with("barcode"), -starts_with("inventory_code"), -starts_with("Lib|lib"), -starts_with("extract"), -run_start_date, -cage_id, -mouse_strain, -qiacube_id, -dna_conc_ng_ul, -redo_dna_conc_ng_ul, -library_conc_ng_ul, -redo_library_conc_ng_ul, -pooled, -ends_with("barcode"), -starts_with("novaseq"), -starts_with("Vol"), -starts_with("box"), -study_day_1, -study_day, -LinkerPrimerSequence, -current_antibiotics, -time_collected, -polymerase, -miseq_id, -flow_cell_id, -Description) %>%
+  mutate(date_collected = "2024") %>%
+  mutate(study_group = case_when(str_detect(SampleID, "noECC") ~ "noECC",
+                                 str_detect(SampleID, "ECC\\.noCa") ~ "ECC.noCa",
+                                 str_detect(SampleID, "ECC\\.Ca") ~ "ECC.Ca",
+                                 str_detect(SampleID, "Ca.isolates") ~ "Isolate")) %>%
+  mutate(study_group = fct_relevel(study_group, "noECC"))
+
+color_by <- NULL
+shape_by <- NULL
+quality_by <- "SampleType"
+potential_headers <- c("study_group", "study_day", "subject_id",
+                       "current_antibiotics", "host_species", "cage_number") #pick 2
+header_idx <- which(is.element(potential_headers, colnames(s)))
+
+if(length(header_idx)>0){
+  color_by <- potential_headers[header_idx[1]]
+}
+if(length(header_idx)>1){
+  shape_by <- potential_headers[header_idx[2]]
+}
+
+run_date <- "Date"
+investigator <- "Investigator"
+
+show.text <- nrow(s) > 40
+```
+
+```{r qc}
+
+qc <- read_delim(qc_reads_fp, delim = "\t", col_names = FALSE) %>%
+  dplyr::rename(counts = "X1") %>%
+  mutate(filename = gsub(".*/", "", X2)) %>%
+  mutate(direction = ifelse(grepl("_R1", filename), "Forward reads from samples",
+                     ifelse(grepl("_R2", filename), "Reverse reads from samples", NA))) %>%
+  fill(direction, .direction = "downup") %>%
+  mutate(SampleID = gsub("_.*", "", filename)) %>%
+  mutate(trim_stage = ifelse(grepl("_R[12].fastq", filename), "Initial demultiplex",
+                      ifelse(grepl("_r_trimmed.fastq", filename), "Reverse primer trim",
+                      ifelse(grepl("_rf_trimmed.fastq", filename), "Forward primer trim", NA)))) %>%
+  mutate(trim_stage = factor(trim_stage, levels = c("Initial demultiplex", "Reverse primer trim", "Forward primer trim"))) %>%
+  group_by(SampleID, direction) %>%
+  mutate(initial_reads = ifelse(trim_stage == "Initial demultiplex", counts, NA)) %>%
+  fill(initial_reads, .direction = "downup") %>%
+  ungroup() %>%
+  mutate(perc_reads = ifelse(initial_reads != 0, counts/initial_reads, 0)) %>%
+  merge(select(s, SampleID, SampleType), by = "SampleID", all.x = TRUE)
+
+pre_fastqc_df <- read.delim(pre_fastqc_fp, sep='\t')[,1:39] %>%
+  pivot_longer(-Samples, names_to="Position", values_to="Quality") %>%
+  mutate(
+    Position = sub("X", "", Position),
+    Position = sub("\\.\\d+", "", Position, perl = TRUE),
+    Position = as.numeric(Position)) %>%
+  mutate(SampleID=sub("^(.*)_(R[12])$", "\\1", Samples), Direction=sub("^(.*)_(R[12])$", "\\2", Samples)) %>%
+  mutate(Direction = factor(Direction)) %>%
+  filter(SampleID %in% s$SampleID) %>%
+  group_by(Direction, Position) %>%
+  summarise(MeanQual = mean(Quality, na.rm = T), SdQual = sd(Quality, na.rm = T)) %>%
+  ungroup()
+
+post_fastqc_df <- read.delim(post_fastqc_fp, sep='\t')[,1:39] %>%
+  pivot_longer(-Samples, names_to="Position", values_to="Quality") %>%
+  mutate(
+    Position = sub("X", "", Position),
+    Position = sub("\\.\\d+", "", Position, perl = TRUE),
+    Position = as.numeric(Position)) %>%
+  mutate(SampleID=sub("_rf_trimmed", "", Samples)) %>%
+  mutate(Direction = "R1") %>%
+  filter(SampleID %in% s$SampleID) %>%
+  group_by(Direction, Position) %>%
+  summarise(MeanQual = mean(Quality, na.rm = T), SdQual = sd(Quality, na.rm = T)) %>%
+  ungroup()
+
+# This takes about a minute to read in, so I stashed it:
+# It took my system 36 seconds wahoo
+# library(microbenchmark)
+# 
+# microbenchmark(read_lengths <- read_delim(read_lengths_fp, delim = "\t", col_names = TRUE) %>%
+#   mutate(primer = ifelse(direction == "reverse", "First trim, reverse primer", "Second trim, forward primer")) %>%
+#   merge(select(s, SampleID, SampleType), by = "SampleID", all.x = TRUE), times = 1)
+# saveRDS(read_lengths, file = file.path(data_dir, "read_lengths.rds"))
+read_lengths <- readRDS(file = file.path(data_dir, "read_lengths.rds"))
+
+top_trimmed <- read_delim(trimmed_seq_fp, delim = "\t", col_names = c("SampleID", "count", "trim_type", "trimmed_length", "sequence", "direction")) %>%
+  #removing the headers from these files
+  filter(trim_type != "match_type", trimmed_length!="trimmed_length") %>%
+  merge(select(s, SampleID, SampleType), by = "SampleID", all.x = TRUE) %>%
+  group_by(SampleType, trim_type, direction, sequence) %>%
+  summarize(total_counts = sum(count)) %>%
+  ungroup() %>%
+  group_by(SampleType, trim_type, direction) %>%
+  slice_max(total_counts, n = 3) %>%
+  ungroup() %>%
+  # filter(total_counts > 1) %>%
+  merge(unique(select(s, SampleType, isControl)), by = "SampleType", all.x = TRUE) %>%
+  mutate(direction = factor(direction, levels = sort(unique(direction), decreasing = TRUE))) %>%
+  mutate(trim_type = factor(trim_type, levels = c("Complete", "Partial", "Alignment"))) %>%
+  mutate(sequence = factor(sequence, levels = unique(sequence[order(isControl, SampleType, direction, trim_type, total_counts, decreasing = TRUE)]))) %>%
+  arrange(isControl, SampleType, direction, trim_type, -total_counts) %>%
+  select(-isControl)
+```
+
+
+```{r for basic report}
+### ====================================
+### Select specific groups to plot for QC
+### ====================================
+s_toPlot <- s %>%
+  filter(Read_Counts > 0 & !is.na(Read_Counts)) %>%
+  select(SampleID, subject_id, all_of(quality_by), all_of(color_by), all_of(shape_by), final_library_conc_ng_ul, Keep, isControl, richness, shannon, plate) %>%
+  arrange(eval(parse(text=quality_by)), eval(parse(text=color_by)), eval(parse(text=shape_by))) %>%
+  mutate(SampleID = as.character(SampleID))
+
+```
+
+```{r prop to test}
+### ====================================
+### Select specific groups to test and color them
+### ====================================
+
+#variables to test and colors
+sg_toTest <- c("study_group")
+
+s_toTest <- s %>%
+  filter(Keep) %>%
+  filter(!isControl, !is.na(study_group)) %>%
+  ##can use mutate and factor the levels to reorder groups
+  mutate(study_group = factor(study_group, levels=unique(study_group))) %>%     
+  ##changing order of study_groups
+  mutate(SampleID = as.character(SampleID)) %>%
+  mutate(subject_id = as.character(subject_id)) %>%
+  arrange(eval(parse(text=quality_by)), eval(parse(text=color_by)), eval(parse(text=shape_by))) %>%
+  droplevels()
+
+props_toTest <- summed_props %>%
+  reshape2::melt() %>%
+  setNames(c("Taxa", "SampleID", "props")) %>%
+  filter(SampleID %in% s_toTest$SampleID) %>%
+  merge(select(s_toTest, SampleID, subject_id, Read_Counts, sg_toTest, quality_by, color_by, shape_by), by="SampleID", all.y = TRUE) %>%
+  group_by(Taxa) %>%
+  mutate(mean_props = mean(props)) %>%
+  ungroup() %>%
+  filter(mean_props > prop_cut) %>%
+  #filter any Archaea that passed through
+  filter(!grepl("archae", Taxa)) %>%
+  mutate(phyla = gsub(" .*", "", Taxa)) %>%
+  mutate(phyla = factor(phyla, levels = unique(phyla))) %>%
+  mutate(phyla = fct_relevel(phyla, "p__Ascomycota",
+                                    "p__Basidiomycota",
+                                    "p__Chytridiomycota",
+                                    "p__Glomeromycota",
+                                    "p__Zygomycota",
+                                    "p__Deuteromycota")) %>%
+  arrange(phyla)
+
+props_toTest %<>%
+  group_by(Taxa) %>%
+  filter(sum(props) > 0) %>%
+  mutate(taxa_min = min(props[props > 0])) %>%
+  mutate(props = ifelse(props == 0, taxa_min/2, props)) %>%
+  ungroup() %>%
+  mutate(props = if_else(props >= 1, 0.999999, props)) %>% #this accounts for samples that are entirely one taxa
+  mutate(props_log2 = log2(props))
+
+## Set colors for each factor ahead of time so they are consistent through the report.
+ann_colors = list(
+  study_group = setNames(as.character(wes_palette("FrenchDispatch", length(levels(s_toTest$study_group)), type = "discrete")), levels(s_toTest$study_group))
+)
+
+ann_colors = list(study_group = c(noECC = "#90D4CC", ECC.Ca = "#BD3027", ECC.noCa = "#B0AFA2"
+))
+
+```
+
+```{r mockdna-contamination, eval=FALSE, include=FALSE, results='asis'}
+## Check if any samples contained >= 5% positive control sequences and alert the lab
+# Set contamination cutoff level above
+mockdnasamples=colnames(summed_props)[grepl(colnames(summed_props), pattern="mockdna", ignore.case = TRUE)]
+if (length(mockdnasamples) > 1) {
+  mockDNAsums <- rowSums(summed_props[,mockdnasamples])
+} else {
+    mockDNAsums <- summed_props[,mockdnasamples]
+}
+mockDNAtophit <- as.character(na.omit(names(mockDNAsums[order(mockDNAsums, decreasing = TRUE)][mockDNAsums[order(mockDNAsums, decreasing = TRUE)]>0][1:3]))) # top 3 bugs present in mock DNA sample
+
+if (length(mockDNAtophit) == 1) {
+  contaminated_samples <- colnames(summed_props)[summed_props[as.character(mockDNAtophit),] >= pos_ctrl_threshold] # grab samples that have >=5% Vibrio 
+} else {
+  contaminated_samples <- colnames(summed_props)[colSums(summed_props[as.character(mockDNAtophit),] >= pos_ctrl_threshold) > 0] # grab samples that have >=5% Vibrio 
+}
+
+contaminated_samples <- contaminated_samples[!(contaminated_samples %in% mockdnasamples)] # and are not labeled Mock DNA samples.
+if (length(contaminated_samples)>0) {
+    # pander(rbind(t(data.frame(Total_Reads = colSums(summed_cts[, contaminated_samples]))), summed_props[as.character(mockDNAtophit), contaminated_samples]), caption = paste(c("ALERT: THE FOLLOWING SAMPLES CONTAIN AT LEAST",  100*pos_ctrl_threshold, "% POSITIVE CONTROL MOCK DNA SEQUENCES from", paste(as.character(mockDNAtophit), collapse = ",")), collapse = " "))
+    # stop("Contamination of mock DNA sequences found in other samples.")
+    # print("Contamination of mock DNA sequences found in other samples.")
+} 
+if (!any((as.character(mockDNAtophit) %in% c("Streptophyta Luffa", "Cnidaria Acanthastrea echinata", "Cnidaria Hydra vulgaris", "Streptophyta Luffa acutangula")))) {
+    warning(paste("Mock DNA samples were dominated by an unexpected species:", as.character(mockDNAtophit)), "\nPlease manually check for sample cross-contamination.")
+}
+```
+
+```{r mockdna-contamination-plots, eval=FALSE, include=FALSE, results='asis'}
+# just for bfx testing- total reads vs non-fungi taxa read counts in "contaminated samples"
+for (i in 1:4) {
+  #print(mockDNAtophit[i])
+    plot(y=log10(summed_cts[mockDNAtophit[i], c(contaminated_samples, mockdnasamples)]), 
+         x=log10(colSums(summed_cts[, c(contaminated_samples, mockdnasamples)])), 
+         col = viridis(n=2, begin = 0, end = 0.75)[c(rep(1, length(contaminated_samples)), rep(2, length(mockdnasamples)))],
+         # xlim = c(log10(1), log10(10000000)),
+         main = mockDNAtophit[i], xlab = "Read Depth (log-scale)", ylab = paste(mockDNAtophit[i], "reads (log-scale)"))
+    legend(x="top",legend = c("Mock DNA", "Contaminated sample"), fill = c("#5DC863FF", "#440154FF"))
+    abline(v = log10(min_reads), lty=2, col="red", lwd=2)
+}
+```
+
+
+```{r filter-non-fungi, eval=FALSE, include=FALSE}
+# summed_cts_filt <- summed_cts %>%
+#   as.data.frame() %>%
+#   rownames_to_column(var = "Taxa") %>%
+#   pivot_longer(!Taxa, names_to = "SampleID", values_to = "counts") %>%
+#   filter(!(Taxa %in% mockDNAtophit)) %>%
+#   group_by(SampleID) %>%
+#     mutate(read_counts_no_mock_dna = sum(counts)) %>%
+#   ungroup() %>%
+#   pivot_wider(id_cols = Taxa, values_from = counts, names_from = SampleID) %>%
+#   column_to_rownames(var = "Taxa")
+# summed_cts_filt %>% filter(SampleID %in% contaminated_samples) %>% select(SampleID, read_counts_no_mock_dna) %>% distinct()
+# summed_props_filt <- sweep(summed_cts_filt, 2, colSums(summed_cts_filt), "/")
+
+ta_filt <- ta %>% filter(Kingdom == "Fungi")
+ta_mock <- ta %>% filter(Kingdom != "Fungi")
+adf_filt = taxafmt::split_lineage(ta_filt$Classification, pattern = ";")
+# adf_filt$Sequence = ta_filt$Sequence
+counts_filt = counts[!(row.names(counts) %in% ta_mock$Sequence),]
+a=taxafmt::format_taxa(adf_filt)
+names(a) <- ta_filt$Sequence
+
+summed_cts_filt <- rowsum(counts_filt, a)
+summed_props_filt <- sweep(summed_cts_filt, 2, colSums(summed_cts_filt), "/")
+
+### get read counts
+read_counts_fungi <- colSums(counts_filt) %>% 
+  as.data.frame() %>%
+  setNames(c("Read_Counts_fungi")) %>%
+  rownames_to_column(var="SampleID")
+
+#get only Kingdom and Phylum info
+a_p <- simplify_assignments(adf_filt, rank1="Kingdom", rank2="Phylum")
+names(a_p) <- ta_filt$`Sequence`
+summed_cts_p_filt <- rowsum(counts_filt, a_p) 
+summed_props_p_filt <- sweep(summed_cts_p_filt, 2, colSums(summed_cts_p_filt), "/")
+
+#get only Phylum and Family info
+a_f <- simplify_assignments(adf_filt, rank1="Phylum", rank2="Family")
+names(a_f) <- ta_filt$`Sequence`
+summed_cts_f_filt <- rowsum(counts_filt, a_f) 
+summed_props_f_filt <- sweep(summed_cts_f_filt, 2, colSums(summed_cts_f_filt), "/")
+
+#get only Phylum and Genus info
+a_g <- simplify_assignments(adf_filt, rank1="Phylum", rank2="Genus")
+names(a_g) <- ta_filt$`Sequence`
+summed_cts_g_filt <- rowsum(counts_filt, a_g) 
+summed_props_g_filt <- sweep(summed_cts_g_filt, 2, colSums(summed_cts_g_filt), "/")
+
+```
+
+
+```{r load pcoa}
+
+bc <- vegdist(method = "bray", t(summed_props), binary = F) # Bray-Curtis
+jd <- vegdist(method = "jaccard", t(summed_props), binary = T) #Jaccard
+so <- vegdist(t(summed_props), method="bray", binary=T) # Sorensen
+
+# bc_filt <- vegdist(method = "bray", t(summed_props_filt), binary = F) # Bray-Curtis
+# jd_filt <- vegdist(method = "jaccard", t(summed_props_filt), binary = T) #Jaccard
+# so_filt <- vegdist(t(summed_props_filt), method="bray", binary=T) # Sorensen
+
+```
+
