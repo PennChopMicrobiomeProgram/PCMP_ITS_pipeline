@@ -66,13 +66,20 @@ To run the pipeline, we need
 ### Demultiplexing
 Input: Multiplexed Illumina sequencing files  
 Output: manifest.csv, total_read_counts.tsv, demultiplexed fastq files
+### Fastqc
+Input: demultiplexed fastq files OR output reads from Primer trimming
+Output: fastqc reports, concatenated fastqc_quality.tsv with all quality scores
+*Note* Fastqc is done at beginning and end of quality control to show differences
 ### Primer trimming
 Removes ITS forward and reverse primer sequences from reads  
-Output: reads/(reads.log, top_{rf}_seqs_trimmed.txt, {rf}_trimmed_removed_counts.txt)
+Output: reads/(reads.log, top_{rf}_seqs_trimmed.txt, {rf}_trimmed_removed_counts.txt, {rf}_trimmed.fastq)
 ### OTU clustering
 Create OTUs from amplicons using vsearch. Singletons are discarded for creating the OTUs, but used for the counts.  
 Rules are based on this wiki: (https://github.com/torognes/vsearch/wiki/Alternative-VSEARCH-pipeline)  
 Output: otu/otu_sorted.tsv
 ### BROCC
-Determine the taxonomic assignments of the OTUs by through a consensus based BLAST result (https://github.com/kylebittinger/brocc)  
+Determine the taxonomic assignments of the OTUs through a consensus based BLAST result (https://github.com/kylebittinger/brocc)  
 Output: BLAST_BROCC_output/out_brocc/brocc.log
+
+## Optional but sometimes necessary
+`run_fastqc_report.py` is included to manually run the concatenation step for all the individual fastqc reports. This is because snakemake errors out when, for example, one of the samples has an empty report.
