@@ -10,15 +10,15 @@ git clone https://github.com/PennChopMicrobiomeProgram/PCMP_ITS_pipeline.git
 - Create a conda environment and install the required packages:
 ```bash
 cd PCMP_ITS_pipeline
-conda create -n PCMP_ITS_pipeline --channel bioconda --channel conda-forge --channel defaults python=3.9
+conda create -n PCMP_ITS_pipeline --channel bioconda --channel conda-forge --channel defaults python=3.10
 conda install --name PCMP_ITS_pipeline --file requirements.txt
-/anaconda/envs/venv_name/bin/pip install brocc #brocc needs to be installed through your environment's pip
 ```
 
-- The following software also need to be installed:
+- The following software also need to be installed into the new environment:
   - `dnabc` (https://github.com/PennChopMicrobiomeProgram/dnabc)
   - `primertrim` (https://github.com/PennChopMicrobiomeProgram/primertrim)
   - `brocc` (https://github.com/kylebittinger/brocc)
+  - `heyfastq` (https://github.com/kylebittinger/heyfastq)
   - To install (dnabc as example):
   ```bash
   git clone https://github.com/PennChopMicrobiomeProgram/dnabc
@@ -34,11 +34,10 @@ To run the pipeline, we need
 ## How to run
 - Create a project directory, e.g. `/scr1/users/tuv/ITS_Run1`
 - Copy the files from this repository into that directory
-- Edit `config.yml` so that it suits your project. In particular,
+- Edit `project_config.yml` so that it suits your project. In particular,
   - **all: project_dir**: Path to the project directory, e.g. `"/scr1/users/tuv/ITS_Run1"`
   - **all: mux_dir**: Directory containing multiplexed Illumina sequencing reads, which does not have to be in the project directory, e.g. `"/path/to/mux_files"`; if samples are already demultiplexed, just fill in demux_dir
   - **all: demux_dir**: Leave blank if want to demultiplex using this pipeline; otherwise, the directory containing demultiplexed R1/R2 read pairs, which does not have to be in the project directory
-  - **all: threads**: Number of threads to use
   - **all: mapping_file**: Mapping file of samples with barcode information for demultiplexing
   - **all: forward_direction**: TRUE/FALSE for using forward/reverse read for this pipeline
   - **demux: mismatch**: Number of allowable basepair mismatches on barcode sequence for demultiplexing
@@ -53,15 +52,11 @@ To run the pipeline, we need
   - **otu: threads**: Number of threads to use
   - **otu: chimera_db**: Path to UCHIME reference dataset for chimera detection (see https://unite.ut.ee/repository.php); leave blank if using mock DNA amplified with chimera primers
   - **blastn: ncbi_db**: Path to a local ncbi nt database
-- To run the pipeline, activate the environment by entering `conda activate PCMP_ITS_pipeline`, `cd` into the project directory and execute:
-```bash
-snakemake \
-    --configfile path/to/config.yml \
-    --keep-going \
-    --latency-wait 90 \
-    --notemp
-```
-- When submitting jobs using slurm, you may run `sbatch run_snakemake.bash config.yml`
+  - **brocc: taxonomy_db**: Path to brocc nt database created with brocc's `create_local_taxonomy_db.py`
+- Edit congfig.yml:
+  - **cluster:** and **default-resources:** to match your slurm cluster setup
+  - **configfile:** Absolute path to the `project_config.yml` above
+- To run the pipeline, simply `bash run_snakemake.bash`
 - You can use the [skeleton.Rmd](Rmd/skeleton.Rmd) to create a basic bioinformatic report from the results
   
 ## Notes on BROCC
