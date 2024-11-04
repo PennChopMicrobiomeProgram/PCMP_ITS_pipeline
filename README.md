@@ -57,7 +57,7 @@ To run the pipeline, we need
   - **cluster:** and **default-resources:** to match your slurm cluster setup
   - **configfile:** Absolute path to the `project_config.yml` above
 - To run the pipeline, simply `bash run_snakemake.bash`
-- You can use the [skeleton.Rmd](Rmd/skeleton.Rmd) to create a basic bioinformatic report from the results
+- You can use the files in the `Rmd` folder to create a basic bioinformatic report from the results (assuming some skill with Rstudio / R)
   
 ## Notes on BROCC
 `create_local_taxonomy_db.py` may be used to install a local taxonomy db for faster processing
