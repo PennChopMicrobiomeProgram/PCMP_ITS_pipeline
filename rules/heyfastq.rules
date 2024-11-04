@@ -1,0 +1,13 @@
+dir = "2"
+if config["all"]["forward_direction"]:
+  dir = "1"
+
+rule run_heyfastq:
+    input:
+        DEMUX_DIR + "/{sample}_R" + dir + ".fastq"
+    output:
+        TRIM_QUAL_DIR + "/{sample}_R" + dir + ".fastq"
+    shell:
+        """
+        heyfastq trim-qual --input {input} --output {output}
+        """

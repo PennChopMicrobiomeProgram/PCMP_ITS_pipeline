@@ -15,7 +15,12 @@ FASTA_DIR = INTER_DIR + "/fq2fa"
 BL_BR_DIR = PROJECT_DIR + "/BLAST_BROCC_output"
 MAPPING_FP = PROJECT_DIR + "/" + config["all"]["mapping_file"]
 SAMPLE_IDS = util_functions.get_sample(MAPPING_FP)
+PRE_FASTQC_DIR = PROJECT_DIR + "/pre_fastqc"
+POST_FASTQC_DIR = PROJECT_DIR + "/post_fastqc"
+TRIM_QUAL_DIR = INTER_DIR + "/heyfastq_out"
 
+include: "rules/heyfastq.rules"
+include: "rules/fastqc.rules"
 include: "rules/targets.rules"
 include: "rules/blast_n_brocc.rules"
 include: "rules/otu.rules"
