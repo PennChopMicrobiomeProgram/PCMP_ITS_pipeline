@@ -7,7 +7,7 @@ from collections import OrderedDict
 from io import StringIO
 from typing import TextIO
 # Folder Path
-path = "/scr1/users/project_dir/Data/post_fastqc/reports"
+path = "/mnt/isilon/microbiome/analysis/danielsg/PCMP_ITS_pipeline/test/post_fastqc/reports"
 # Change the directory
 os.chdir(path)
 # Read text File

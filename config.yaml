@@ -58,4 +58,4 @@ set-resources:
   - count_trimmings:mem_mb=24000
   - count_trimmings:runtime=720
 
-configfile: "/scr1/users/danielsg/CHOPMC-392_Liu_ITS/Scripts/HPC_cluster/PCMP_ITS_pipeline/project_config.yml"
+configfile: "/mnt/isilon/microbiome/analysis/danielsg/PCMP_ITS_pipeline/project_config.yml"
