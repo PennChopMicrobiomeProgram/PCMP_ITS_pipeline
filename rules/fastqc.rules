@@ -17,7 +17,7 @@ rule pre_fastqc_report:
     input:
         files=expand(PRE_FASTQC_DIR + "/reports" + "/{sample}_{direction}_fastqc/fastqc_data.txt", sample = SAMPLE_IDS, direction = ["R1", "R2"]),
     output:
-        PRE_FASTQC_DIR + "/fastqc_quality.tsv",
+        PRE_FASTQC_DIR + "/fastqc_quality_report.tsv",
     script:
         "../scripts/fastqc_report.py"
 
@@ -25,7 +25,7 @@ rule post_fastqc:
     input:
         expand(PRIMER_TRIM_FP + "/{sample}_rf_trimmed.fastq", sample = SAMPLE_IDS),
     output:
-        expand(POST_FASTQC_DIR + "/reports" + "/{sample}_fastqc/fastqc_data.txt", sample = SAMPLE_IDS),
+        expand(POST_FASTQC_DIR + "/reports" + "/{sample}_rf_trimmed_fastqc/fastqc_data.txt", sample = SAMPLE_IDS),
     shell:
         """
         sample_dir=$(dirname {output[0]})
@@ -37,8 +37,8 @@ rule post_fastqc:
 rule post_fastqc_report:
     """ make fastqc reports """
     input:
-        files=expand(POST_FASTQC_DIR + "/reports" + "/{sample}_fastqc/fastqc_data.txt", sample = SAMPLE_IDS),
+        files=expand(POST_FASTQC_DIR + "/reports" + "/{sample}_rf_trimmed_fastqc/fastqc_data.txt", sample = SAMPLE_IDS),
     output:
-        POST_FASTQC_DIR + "/fastqc_quality.tsv",
+        POST_FASTQC_DIR + "/fastqc_quality_report.tsv",
     script:
         "../scripts/fastqc_report.py"

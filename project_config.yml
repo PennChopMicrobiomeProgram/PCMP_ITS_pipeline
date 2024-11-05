@@ -1,13 +1,13 @@
 all:
-  project_dir: "/scr1/users/username/project"
+  project_dir: "/mnt/isilon/microbiome/analysis/danielsg/PCMP_ITS_pipeline/test"
   mux_dir: "multiplexed_fastq" #directory that holds multiplexed data or leave blank if files already demultiplexed
   demux_dir:  #leave blank to demultiplex or full path to demultiplexed gunzipped fastq files
-  mapping_file: "mapping_file.tsv" #relative to project_dir
+  mapping_file: "test_mapping_file.tsv" #relative to project_dir
   forward_direction: TRUE #If TRUE, use the forward reads; else, use reverse
 
 demux:
     mismatch: 0
-    revcomp: FALSE
+    revcomp: TRUE
 
 trim:
   f_primer: CTTGGTCATTTAGAGGAAGTAA
