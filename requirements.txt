@@ -3,3 +3,4 @@ snakemake=7.31.1
 blast
 vsearch=2.28.1
 pandas
+fastqc
